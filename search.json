@@ -1,0 +1,1006 @@
+[
+  {
+    "objectID": "exercises/04_genome_qc_verdict.html",
+    "href": "exercises/04_genome_qc_verdict.html",
+    "title": "Is this genome good enough?",
+    "section": "",
+    "text": "Goal: for each sample, gather the quality numbers in one table, then take a decision: is the genome usable for phylogenetics (Day 4), does it need review or re-sequencing, or must it be discarded? A genome is never “good” or “bad” in itself: it is good enough for a purpose, judged on a handful of numbers.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Is this genome good enough?"
+    ]
+  },
+  {
+    "objectID": "exercises/04_genome_qc_verdict.html#the-numbers-that-matter",
+    "href": "exercises/04_genome_qc_verdict.html#the-numbers-that-matter",
+    "title": "Is this genome good enough?",
+    "section": "The numbers that matter",
+    "text": "The numbers that matter\n\n\n\n\n\n\n\nMetric\nWhy it matters\n\n\n\n\nTotal reads / % mapped\nhow much data, and how much of it is the virus (low % = contamination, poor enrichment)\n\n\nMean depth\naverage confidence of the base calls\n\n\n% of genome ≥ 10x (breadth)\nhow much of the genome can really be called\n\n\n% N and longest run of N\nmissing information; a long run = a whole region (gene) is missing\n\n\nNegative control\nare there viral reads where there should be none?",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Is this genome good enough?"
+    ]
+  },
+  {
+    "objectID": "exercises/04_genome_qc_verdict.html#step-1-build-the-summary-table",
+    "href": "exercises/04_genome_qc_verdict.html#step-1-build-the-summary-table",
+    "title": "Is this genome good enough?",
+    "section": "Step 1 — Build the summary table",
+    "text": "Step 1 — Build the summary table\nThis one command collects, for every sample, the numbers you computed in the previous exercises:\nprintf \"sample\\ttotal_reads\\tpct_mapped\\tmean_depth\\tpct_ge10x\\tN_bases\\tlongest_N_run\\n\" &gt; results/qc_summary.tsv\nfor s in S01 S02 S03 S04 S05; do\n  total=$(samtools view -c -F 2304 results/bam/$s.bam)\n  mapped=$(samtools view -c -F 2308 results/bam/$s.bam)\n  pm=$(awk -v m=$mapped -v t=$total 'BEGIN{printf \"%.1f\", 100*m/t}')\n  dp=$(awk '{t+=$3; if($3&gt;=10) n++} END{printf \"%.1f\\t%.1f\", t/NR, 100*n/NR}' results/coverage/$s.depth.tsv)\n  nb=$(grep -v '&gt;' results/consensus/$s.fa | tr -cd 'N' | wc -c)\n  run=$(grep -v '&gt;' results/consensus/$s.fa | tr -d '\\n' | grep -o 'N\\+' | awk '{print length}' | sort -n | tail -1)\n  printf \"%s\\t%s\\t%s\\t%s\\t%s\\t%s\\n\" \"$s\" \"$total\" \"$pm\" \"$dp\" \"$nb\" \"${run:-0}\" &gt;&gt; results/qc_summary.tsv\ndone\ncolumn -t -s $'\\t' results/qc_summary.tsv\n(samtools view -c -F 2304 counts the primary reads; -F 2308 the primary reads that are mapped.)\nCross-check: compare your table with precomputed/qc_summary.tsv (same numbers, plus a PASS / REVIEW / FAIL column).",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Is this genome good enough?"
+    ]
+  },
+  {
+    "objectID": "exercises/04_genome_qc_verdict.html#step-2-take-a-decision-for-each-sample",
+    "href": "exercises/04_genome_qc_verdict.html#step-2-take-a-decision-for-each-sample",
+    "title": "Is this genome good enough?",
+    "section": "Step 2 — Take a decision for each sample",
+    "text": "Step 2 — Take a decision for each sample\nUse these example thresholds (many laboratories use similar ones; adapt them to your protocol):\n\n\n\nCriterion\nGood\nTo review\nBad\n\n\n\n\n% mapped\n≥ 90 %\n70–90 %\n&lt; 70 %\n\n\nGenome ≥ 10x\n≥ 90 %\n70–90 %\n&lt; 70 %\n\n\n% N\n≤ 10 %\n10–20 %\n&gt; 20 %\n\n\nNegative control\n≤ 10 viral reads\n–\nmore\n\n\n\nFill in exercises/answer_sheet.tsv: for each sample, the numbers, a verdict (use / review–re-sequence / discard) and a one-line justification. Then compare with your neighbour.\n\n\n\n\n\n\nTipExpected table and verdicts\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nSample\nReads\n% mapped\nMean depth\n% ≥ 10x\n% N\nLongest N\nVerdict\nWhy\n\n\n\n\nS01\n6,666\n100\n99.8\n99.4\n0.6\n33\nUse\ncomplete, deep, clean\n\n\nS02\n6,666\n100\n99.7\n84.3\n15.7\n1,526\nReview / re-sequence\ngood depth, but a 1.5 kb gap (amplicon dropout)\n\n\nS03\n340\n100\n5.1\n5.0\n95.1\n2,248\nDiscard / re-sequence\nfar too little data, 95 % N\n\n\nS04\n6,666\n75.0\n74.7\n99.4\n0.6\n30\nReview (then use)\ngenome complete, but 25 % off-target reads: find the contamination source\n\n\nS05 (NTC)\n450\n11.1\n0.8\n0.0\n100\n10,000\nControl: to report\n50 viral reads in a negative control",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Is this genome good enough?"
+    ]
+  },
+  {
+    "objectID": "exercises/04_genome_qc_verdict.html#step-3-discussion-questions",
+    "href": "exercises/04_genome_qc_verdict.html#step-3-discussion-questions",
+    "title": "Is this genome good enough?",
+    "section": "Step 3 — Discussion questions",
+    "text": "Step 3 — Discussion questions\n1. Which sample would you re-sequence, and what would you change?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\n\nS03: re-sequence from a new library with more input material (re-extract, concentrate the RNA, more reads in the pool) — it has only 5x depth, repeating the same run will not help.\nS02: do not repeat everything: re-amplify only the failed region (around 3,500–5,000). Check whether a known mutation falls in a primer site; if so, add or redesign primers, or use a different primer scheme for this lineage.\nS04: the genome is complete; the question is the laboratory source of the off-target reads (host DNA, contaminated reagents). Consider host depletion or a cleaner extraction, and identify the reads with Kraken2.\n\n\n\n\n2. What do you report about the negative control?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nAlways report it, even if it looks “clean”. Say: the number of reads in the NTC (450), how many map to the virus (50, i.e. 25 pairs), their likely origin (barcode bleed from S01, whose variants they carry), and the consequence for the run: samples with a signal close to that level (S03) cannot be interpreted; high-depth samples (S01, S02, S04) are not affected. If the contamination were larger than a few reads, the whole run should be repeated.\n\n\n\n3. Which thresholds would you set for your own laboratory?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThere is no universal answer; the thresholds depend on what the genome is used for:\n\nLineage assignment: tolerates more N (as long as the lineage-defining positions are covered), e.g. ≥ 80–90 % of the genome.\nPhylogenetics and transmission: stricter, e.g. ≥ 90–95 % of the genome at ≥ 10–20x, no long run of N.\nNegative controls: a maximum number of viral reads (e.g. ≤ 10), or a ratio to the samples.\n\nWrite them down, test them on known samples (positive controls, replicates), apply them the same way to every run, and review them when the protocol changes.\n\n\n\nNext: Reference selection — module 2.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Is this genome good enough?"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html",
+    "href": "exercises/02_mapping.html",
+    "title": "Mapping",
+    "section": "",
+    "text": "Goal: Align trimmed SARS-CoV-2 reads to the reference genome, evaluate mapping statistics, and inspect aligned reads in a genome browser.\nActivate the course environment:\nIn this exercise, we use the paired-end reads from NCBI run SRR26396743, cleaned in the previous session, and the SARS-CoV-2 reference genome NC_045512.2.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#step-1-index-the-reference-genome",
+    "href": "exercises/02_mapping.html#step-1-index-the-reference-genome",
+    "title": "Mapping",
+    "section": "Step 1 — Index the reference genome",
+    "text": "Step 1 — Index the reference genome\nBWA requires an index to align reads efficiently. Samtools also creates a FASTA index, which is useful for downstream analysis and visualization.\nbwa index data/SARS-CoV-2_NC_045512.2.fasta\nsamtools faidx data/SARS-CoV-2_NC_045512.2.fasta\nQuestions\n\nWhat files are created by bwa index?\nWhat is the purpose of the .fai file?\nWhy do we index the reference before mapping?\n\n\n\n\n\n\n\nTipAnswers\n\n\n\n\n\n\nbwa index creates auxiliary index files that allow BWA to search the reference efficiently.\nsamtools faidx creates a FASTA index (.fai) containing sequence names, lengths, and file offsets.\nIndexing avoids rebuilding the reference search structures every time we map reads.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#step-2-map-the-trimmed-reads",
+    "href": "exercises/02_mapping.html#step-2-map-the-trimmed-reads",
+    "title": "Mapping",
+    "section": "Step 2 — Map the trimmed reads",
+    "text": "Step 2 — Map the trimmed reads\nCreate an output directory:\nmkdir -p results/bam\nRun BWA-MEM and sort the resulting alignments with Samtools:\n\nIndex the sorted BAM file:\nsamtools index results/bam/SRR26396743.bam\nCalculate the mapping statistics and save them:\nsamtools flagstat results/bam/SRR26396743.bam \\\n  | tee results/bam/SRR26396743.flagstat.txt\nWhat do these commands do?\n\nbwa mem aligns the paired-end reads to the reference genome.\n-t 2 uses two threads for BWA.\n-R adds read-group information, including the run and sample identifiers.\nsamtools sort sorts alignments by genomic coordinate and writes a BAM file.\nsamtools index creates an index for the BAM file.\nsamtools flagstat summarizes alignment and pairing statistics.\ntee displays the results and saves them to a text file.\n\nQuestions\n\nWhat is the difference between a FASTQ file and a BAM file?\nWhy do we use a reference genome?\nWhy are the reads sorted after alignment?\n\nAnswers\nFASTQ files contain read sequences and their base-quality scores. BAM files contain alignment records, including read positions, mapping information, and flags.\nThe reference genome provides the coordinate system used to locate reads along the viral genome.\nSorting arranges the alignments by genomic position, making downstream analysis and regional access more efficient.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#step-3-read-the-mapping-statistics",
+    "href": "exercises/02_mapping.html#step-3-read-the-mapping-statistics",
+    "title": "Mapping",
+    "section": "Step 3 — Read the mapping statistics",
+    "text": "Step 3 — Read the mapping statistics\nDisplay the report:\ncat results/bam/SRR26396743.flagstat.txt\nPay particular attention to these lines:\n\nin total: total number of alignment records examined.\nmapped: number and percentage of mapped alignment records.\nproperly paired: number and percentage of records belonging to pairs aligned in the expected orientation and distance.\nprimary: primary alignment records, excluding secondary and supplementary alignments.\n\nRemember that samtools flagstat reports alignment records, not necessarily read pairs. For paired-end data, one read pair normally produces two alignment records.\nYou can also obtain a compact summary of the BAM file:\nsamtools idxstats results/bam/SRR26396743.bam\nThe output lists reference sequences, their lengths, the number of mapped records, and the number of unmapped records associated with each reference.\nQuestions\n\nWhat percentage of alignment records are mapped?\nWhat percentage are properly paired?\nHow many alignment records are unmapped?\nDoes the mapping result suggest that the reads are compatible with the SARS-CoV-2 reference?\nWhat other factors could explain a low mapping percentage?\n\nAnswers\nUse the values obtained from your own run. Do not assume a particular mapping percentage before analyzing the data.\nA high mapping percentage indicates that many reads align to the reference, but it does not by itself prove that the sample is free of contamination or that the resulting genome is accurate.\nA low mapping percentage may reflect low-quality reads, residual adapters, a reference mismatch, contamination, or a dataset that does not contain the expected organism.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#step-4-visualize-the-alignments-in-igv",
+    "href": "exercises/02_mapping.html#step-4-visualize-the-alignments-in-igv",
+    "title": "Mapping",
+    "section": "Step 4 — Visualize the alignments in IGV",
+    "text": "Step 4 — Visualize the alignments in IGV\nIGV (Integrative Genomics Viewer) allows you to inspect aligned reads and compare their bases with the reference genome.\nFirst, confirm that both the BAM file and its index exist:\nls -lh results/bam/SRR26396743.bam*\nOpen IGV and load the reference genome:\n\nSelect Genomes → Load Genome from File…\nChoose data/ncbi/SARS-CoV-2_NC_045512.2.fasta.\nSelect File → Load from File…\nLoad results/bam/SRR26396743.bam.\nNavigate to a genomic region by entering a coordinate, for example NC_045512.2:1000-2000, if that is the chromosome label displayed by IGV.\n\nZoom in to examine individual reads and their mismatches relative to the reference.\nQuestions\n\nDo the reads cover the whole reference genome or only some regions?\nCan you see bases that differ from the reference?\nAre the differences supported by multiple reads?\nDo the supporting reads have good base quality?\nCan you conclude that a mismatch is a true variant simply because it appears in one read?\n\nAnswers\nA mismatch may represent a genuine variant, a sequencing error, an alignment artifact, or another technical issue.\nBefore interpreting a mismatch, examine its supporting read depth, base quality, mapping quality, strand distribution, and position within the reads. A single observation is not sufficient to establish a true variant.\nNo specific variant positions or allele frequencies are assumed in this exercise; these must be determined from the actual data.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#step-5-explore-read-coverage",
+    "href": "exercises/02_mapping.html#step-5-explore-read-coverage",
+    "title": "Mapping",
+    "section": "Step 5 — Explore read coverage",
+    "text": "Step 5 — Explore read coverage\nUse Samtools to calculate the number of reads covering each reference position:\nsamtools depth -aa results/bam/SRR26396743.bam \\\n  &gt; results/bam/SRR26396743.depth.tsv\nCalculate the mean depth across the reference, including positions with zero coverage:\nawk '{sum += $3; n++} END {\n  if (n &gt; 0) printf \"Mean depth: %.2f\\n\", sum/n;\n  else print \"No positions found\"\n}' results/bam/SRR26396743.depth.tsv\nCalculate the proportion of reference positions covered by at least one read:\nawk '{total++; if ($3 &gt; 0) covered++}\nEND {\n  if (total &gt; 0)\n    printf \"Reference covered: %.2f%%\\n\", 100*covered/total;\n  else\n    print \"No positions found\"\n}' results/bam/SRR26396743.depth.tsv\nQuestions\n\nWhat is the mean read depth?\nWhat percentage of the reference is covered by at least one read?\nAre there regions with zero coverage?\nWhy can a high mapping percentage coexist with low coverage in some regions?\n\nAnswers\nMapping percentage measures how many alignment records map to the reference. Coverage describes how many reads support each reference position.\nA dataset may have a high mapping percentage while still containing poorly covered regions. Those regions may be unreliable for consensus generation or variant analysis.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/02_mapping.html#final-question",
+    "href": "exercises/02_mapping.html#final-question",
+    "title": "Mapping",
+    "section": "Final question",
+    "text": "Final question\nWhy do we sort and index a BAM file?\nAnswer\nSorting arranges the alignments by genomic coordinate. Indexing creates a lookup structure that allows programs such as IGV and Samtools to access a specific genomic region without scanning the entire file.\nMany downstream tools require a coordinate-sorted BAM file and its index.\nNext: Coverage and consensus.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Mapping"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html",
+    "href": "exercises/00_setup.html",
+    "title": "Setup",
+    "section": "",
+    "text": "By the end of this page you will have: conda installed, an environment called analyse with all the tools, the course material on your computer, and a viewer (IGV) to look at alignments.",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#install-conda-miniconda",
+    "href": "exercises/00_setup.html#install-conda-miniconda",
+    "title": "Setup",
+    "section": "1. Install Conda (Miniconda)",
+    "text": "1. Install Conda (Miniconda)\nConda is a program that installs bioinformatics tools and keeps them in separate environments, so that one project does not break another. We use Miniconda, a lightweight, free Conda installer. We will add the conda-forge and bioconda channels to install the bioinformatics tools required for this course.\n\nLinux\nDownload and install the latest Miniconda installer for your system:\nmkdir -p ~/miniconda-installer\ncd ~/miniconda-installer\n\ncurl -LO https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-$(uname -m).sh\nbash Miniconda3-latest-Linux-$(uname -m).sh\nFollow the instructions. Accept the licence and answer yes when asked whether to initialize Conda. Then close and reopen the terminal.\n\n\nMac (Intel or Apple chip)\nDownload and install Miniconda:\nmkdir -p ~/miniconda-installer\ncd ~/miniconda-installer\n\ncurl -LO https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-$(uname -m).sh\nbash Miniconda3-latest-MacOSX-$(uname -m).sh\nFollow the instructions. Accept the licence and initialize Conda when prompted. Then close and reopen the terminal.\n\n\nConfigure Conda channels\nRun these commands once:\nconda config --add channels defaults\nconda config --add channels bioconda\nconda config --add channels conda-forge\nconda config --set channel_priority strict\n\n\nCheck the installation\nconda --version\nconda info\nYou should see the Conda version and installation details. The terminal prompt may start with (base).\nNote: Miniconda does not include mamba by default. You can use conda instead, or install mamba in the base environment:\nconda install -n base -c conda-forge mamba",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#create-the-conda-environment-analyse",
+    "href": "exercises/00_setup.html#create-the-conda-environment-analyse",
+    "title": "Setup",
+    "section": "2. Create the Conda environment analyse",
+    "text": "2. Create the Conda environment analyse\nIf you installed mamba, run:\nmamba env create -f environment.yml\nOtherwise, use:\nconda env create -f environment.yml\nThe installation may take 10–20 minutes or longer, depending on your internet connection and computer.\nActivate the environment:\nconda activate analyse\nThe prompt should now start with (analyse). Run this activation command in every new terminal before using the course tools.",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#check-the-tools-one-by-one",
+    "href": "exercises/00_setup.html#check-the-tools-one-by-one",
+    "title": "Setup",
+    "section": "3. Check the tools, one by one",
+    "text": "3. Check the tools, one by one\nDo not run a script. Type each command and look at the answer: a version number means the tool is installed. If you see command not found, the environment is not active (conda activate analyse) or the tool failed to install — tell the instructor, and see “Plan B” below.\nfastqc --version\nmultiqc --version\ntrimmomatic -version\nseqkit version\nkraken2 --version | head -1\nspades.py --version\nquast.py --version\nbwa 2&gt;&1 | grep Version\nminimap2 --version\nsamtools --version | head -1\nbcftools --version | head -1\nivar version | head -1\nmafft --version\niqtree2 --version | head -1\nfasterq-dump --version",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#install-igv",
+    "href": "exercises/00_setup.html#install-igv",
+    "title": "Setup",
+    "section": "4. Install IGV",
+    "text": "4. Install IGV\nIGV (Integrative Genomics Viewer) shows the reads stacked along the genome, like a zoomable photograph of an alignment. Download the desktop version from https://igv.org/doc/desktop/ (choose Linux or Mac), or use the browser version at https://igv.org/app.",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#real-data-from-ncbi-sars-cov-2-rift-valley-fever",
+    "href": "exercises/00_setup.html#real-data-from-ncbi-sars-cov-2-rift-valley-fever",
+    "title": "Setup",
+    "section": "5. Real data from NCBI (SARS-CoV-2, Rift Valley fever…)",
+    "text": "5. Real data from NCBI (SARS-CoV-2, Rift Valley fever…)\nThe practice data of this course are small, so that every step runs in seconds. The commands you learn work exactly the same on real public data. Here is how to get some from NCBI.\n\na) Find a sequencing run\n\nOpen the SRA database: https://www.ncbi.nlm.nih.gov/sra\nSearch your pathogene, for example:\n\nRift Valley fever: \"Rift Valley fever virus\"[Organism] AND \"ILLUMINA\"[Platform] AND \"PAIRED\"[Layout]\n\nPick a result that is Illumina, paired-end, with a small size (a few hundred MB at most). Note its Run accession: it starts with SRR, ERR or DRR (below we write SRRXXXXXXX: replace it with yours). Read the description to know which protocol was used (amplicon, capture, metagenomics).\n\n\n\nb) Download the reads\nmkdir -p data\ncd data\nprefetch SRR26396743\nfasterq-dump --split-3 --threads 2  SRR26396743\ngzip SRR26396743_1.fastq SRR26396743_2.fastq\ncd ..\n--split-3 separates paired-end reads into separate FASTQ files: two files for reads that form a pair (_1.fastq and _2.fastq) and a third file (.fastq) for reads that do not have a matching mate.\nCheck that R1 and R2 have the same number of reads:\nseqkit stats data/*.fastq.gz\n\n\n\n\n\n\nTipResults\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFile\nFormat\nType\nNumber of reads\nTotal bases\nMin. length\nAverage length\nMax. length\n\n\n\n\nSRR26396743_1.fastq.gz\nFASTQ\nDNA\n330,144\n48,517,409\n51\n147.0\n151\n\n\nSRR26396743_2.fastq.gz\nFASTQ\nDNA\n330,185\n48,275,763\n50\n146.2\n151\n\n\n\n\n\n\n\n\nc) Download the reference genome\nSARS-CoV-2 (one sequence, 29.9 kb):\ncurl -fL --retry 5 --retry-delay 2 \\\n  \"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NC_045512.2&rettype=fasta&retmode=text\" \\\n  -o data/SARS-CoV-2_NC_045512.2.fasta\n\n\n\n\n\n\nTip\n\n\n\n\n-f: Fail if the server returns an HTTP error.\n-L: Follow redirects automatically.\n--retry 5: Retry failed requests up to five times.\n--retry-delay 2: Wait two seconds between retries.\n-o: Save the downloaded content to a specified file.\n\n\n\nseqkit stats data/*.fasta\n\n\n\n\n\n\nTipResults\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nFile\nFormat\nType\nNumber of reads\nTotal bases\nMin. length\nAverage length\nMax. length\n\n\n\n\ndata/NC_045512.2.fasta\nFASTA\nDNA\n1\n29,903\n29,903\n29,903\n29,903",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "exercises/00_setup.html#troubleshooting",
+    "href": "exercises/00_setup.html#troubleshooting",
+    "title": "Setup",
+    "section": "Troubleshooting",
+    "text": "Troubleshooting\n\n\n\n\n\n\n\nProblem\nSolution\n\n\n\n\nconda: command not found\nclose and reopen the terminal; otherwise rerun the Miniforge installer and accept “initialize conda”\n\n\nThe prompt has no (analyse)\nconda activate analyse\n\n\nThe environment creation is very slow\nuse mamba (not conda)\n\n\nOne tool is missing\ninstall it alone: mamba install -n analyse -c bioconda &lt;tool&gt;",
+    "crumbs": [
+      "Preparations",
+      "Setup"
+    ]
+  },
+  {
+    "objectID": "course/05-scenario.html",
+    "href": "course/05-scenario.html",
+    "title": "Scenario and data",
+    "section": "",
+    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
+  },
+  {
+    "objectID": "course/05-scenario.html#the-situation",
+    "href": "course/05-scenario.html#the-situation",
+    "title": "Scenario and data",
+    "section": "",
+    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
+  },
+  {
+    "objectID": "course/05-scenario.html#data",
+    "href": "course/05-scenario.html#data",
+    "title": "Scenario and data",
+    "section": "Data",
+    "text": "Data\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ndata/outbreak/sequences.fasta\n27 consensus genomes (OB01–OB27)\n\n\ndata/outbreak/metadata.tsv\ncollection date and region\n\n\ndata/outbreak/lineage_definitions.tsv\nthe lineage nomenclature\n\n\ndata/reference/TOYV1.fasta\nthe reference\n\n\nyour S01 consensus\nfrom module 1 (precomputed/consensus/S01.fa as plan B)"
+  },
+  {
+    "objectID": "course/05-scenario.html#rules",
+    "href": "course/05-scenario.html#rules",
+    "title": "Scenario and data",
+    "section": "Rules",
+    "text": "Rules\n\nWork in pairs, 3 hours in total.\nYou may use any script from the course.\nExplain every exclusion.\nThe deliverable is a one-page brief with one figure."
+  },
+  {
+    "objectID": "course/05-deliverable.html",
+    "href": "course/05-deliverable.html",
+    "title": "Deliverable and assessment",
+    "section": "",
+    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
+  },
+  {
+    "objectID": "course/05-deliverable.html#what-to-hand-in",
+    "href": "course/05-deliverable.html#what-to-hand-in",
+    "title": "Deliverable and assessment",
+    "section": "",
+    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
+  },
+  {
+    "objectID": "course/05-deliverable.html#presentation",
+    "href": "course/05-deliverable.html#presentation",
+    "title": "Deliverable and assessment",
+    "section": "Presentation",
+    "text": "Presentation\nFive minutes per pair, then questions."
+  },
+  {
+    "objectID": "course/05-deliverable.html#grid",
+    "href": "course/05-deliverable.html#grid",
+    "title": "Deliverable and assessment",
+    "section": "Grid",
+    "text": "Grid\n\n\n\nCriterion\nPoints\n\n\n\n\nData quality handled correctly (exclusions justified)\n2\n\n\nCorrect lineages and relationships\n3\n\n\nFigure clear and honest\n2\n\n\nWording matches evidence, limits stated\n2\n\n\nUseful, concrete recommendations\n1"
+  },
+  {
+    "objectID": "course/04-brief-template.html",
+    "href": "course/04-brief-template.html",
+    "title": "One-page brief template",
+    "section": "",
+    "text": "Use this structure for the Day 5 brief. One page, plain language."
+  },
+  {
+    "objectID": "course/04-brief-template.html#checklist-before-you-share",
+    "href": "course/04-brief-template.html#checklist-before-you-share",
+    "title": "One-page brief template",
+    "section": "Checklist before you share",
+    "text": "Checklist before you share\n\nKey message first\nNumbers consistent between text, table and figure\nExcluded genomes and the reason are listed\nThe negative control is mentioned\nCertainty words match the evidence\nNo patient-identifying information"
+  },
+  {
+    "objectID": "course/03-build-tree.html",
+    "href": "course/03-build-tree.html",
+    "title": "Build a phylogenetic tree",
+    "section": "",
+    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Build a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-build-tree.html#choosing-a-method",
+    "href": "course/03-build-tree.html#choosing-a-method",
+    "title": "Build a phylogenetic tree",
+    "section": "",
+    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Build a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
+    "href": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
+    "title": "Build a phylogenetic tree",
+    "section": "Step 1 — Build the maximum-likelihood tree",
+    "text": "Step 1 — Build the maximum-likelihood tree\nFind the exact name of the root genome in the alignment, then run IQ-TREE:\nOUT=$(grep '&gt;' results/phylo/aln.fasta | grep 'NC_045512.2' | tr -d '&gt;')\necho $OUT\niqtree -s results/phylo/aln.fasta -m MFP -B 1000 -T 2  --prefix results/phylo/tree\nWhat the options mean: -s alignment, -m MFP choose the best model automatically, -B 1000 1,000 ultrafast bootstrap replicates, -T 2 two threads, --seed 1 reproducible result, -o root on the outgroup, --prefix name of the output files.\n(If the model test is too slow on your laptop, use -m GTR+G for a first look.)\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ntree.treefile\nthe tree (Newick format, with bootstrap support)\n\n\ntree.iqtree\nthe full report (model chosen, log-likelihood, tree in text)\n\n\ntree.log\nwhat happened during the run\n\n\n\ngrep \"Best-fit model\" results/phylo/tree.iqtree\nQuestions: which model was chosen? Did IQ-TREE warn about identical sequences?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own report. IQ-TREE may warn that some sequences are identical (or nearly so): this is normal, they end up at the same position in the tree. The exact model matters little here; what matters more is the quality of the alignment.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Build a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
+    "href": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
+    "title": "Build a phylogenetic tree",
+    "section": "Step 2 — Draw and annotate the tree in iTOL",
+    "text": "Step 2 — Draw and annotate the tree in iTOL\n\nOpen https://itol.embl.de and click Upload; upload results/phylo/tree.treefile. (Create an account if you want to keep the tree.)\nIn the control panel, choose the Rectangular display.\nRoot: click on the branch of NC_045512.2 and choose Tree structure → Re-root the tree here.\nSupport: display the bootstrap values (Basic tab, or Advanced tab depending on the version).\nColors: click on an internal node and choose Colors/Styles to colour a clade; colour each lineage (the lineage is in the leaf name) and give your sample, SRR26396743, a different colour.\nExport the picture (PNG, SVG or PDF) from the Export tab.\n\nQuestions: do the lineages form clean groups on the tree? Where is your sample?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree. References of the same lineage should form a group (a clade); sister lineages sit next to each other. Your sample should fall next to the lineage found in the Lineage assignment page. If it sits alone on a long branch, check its percentage of N and its reference set.\n\n\n\nNext: Read a phylogenetic tree.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Build a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html",
+    "href": "course/02-lineage.html",
+    "title": "Lineage assignment",
+    "section": "",
+    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#what-is-a-lineage",
+    "href": "course/02-lineage.html#what-is-a-lineage",
+    "title": "Lineage assignment",
+    "section": "",
+    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
+    "href": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
+    "title": "Lineage assignment",
+    "section": "Step 1 — Find the closest labelled reference",
+    "text": "Step 1 — Find the closest labelled reference\nThe simplest way to give a lineage to a new genome is to ask which labelled genome it resembles most. We reuse the SNP distances:\nsnp-dists -m results/phylo/aln.fasta | awk '$1==\"SRR26396743\" && $2!=\"SRR26396743\"' | sort -k3,3n | column -t\nQuestions\n\nWhich reference is the closest to your sample, and what is its lineage?\nIs the closest reference much closer than the others, or are several references at a similar distance?\nCan you already give a lineage to your sample?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own table. If one reference is clearly closer than all the others, your sample probably belongs to that lineage or to a sub-lineage of it. If several references from different lineages are at similar distances, the real lineage is probably not in your reference set and you need more references. The answer is a proposal, not a final call: it must be confirmed with the tree (next module).",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
+    "href": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
+    "title": "Lineage assignment",
+    "section": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)",
+    "text": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)\nPangolin and Nextclade do this with a complete nomenclature of thousands of lineages and give quality flags (missing data, unexpected mutations). Nothing to install: open https://clades.nextstrain.org, drop results/consensus/SRR26396743.fa in the page and read the clade and Pango lineage it proposes.\nQuestion: does it agree with the lineage of the closest reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe tool may give a more precise lineage (a sub-lineage of the reference that you downloaded), because it knows many more lineages than our 10–15 references. A sub-lineage of the lineage found in Step 1 is a consistent result; a different family means you should re-check the consensus and the references.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#final-question",
+    "href": "course/02-lineage.html#final-question",
+    "title": "Lineage assignment",
+    "section": "Final question",
+    "text": "Final question\nCan two genomes of the same lineage still be unrelated cases? Why?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nYes. A lineage is defined by a few mutations, and many separate chains of transmission can carry the same lineage (for example if it was imported several times, or circulated widely before being sampled). A lineage says “belongs to this family”; to say “linked case” you need finer resolution (extra SNPs, as in the SNP distances) and epidemiological information (dates, places, contacts).\n\n\n\nNext: Build a phylogenetic tree.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html",
+    "href": "course/01-concepts.html",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "",
+    "text": "Both start with the same raw material (FASTQ files) and the same first steps (quality control, trimming, contamination check). They differ in how the genome is rebuilt:\n\nDe novo assembly: reads are stitched together without any reference (new or very divergent virus, bacteria).\nMapping (reference-based): reads are aligned to a known genome, then a consensus is called (known virus: SARS-CoV-2, Rift Valley fever, dengue…).\n\n\n\n\n\n\n\n\nflowchart TD\n  A[\"FASTQ (R1 + R2)\"] --&gt; B[\"1. Quality Control &lt;br/&gt; FastQC &lt;br/&gt;quality of the raw reads\"]\n  B --&gt; C[\"2. Trimming&lt;br/&gt;trimmomatic&lt;br/&gt;remove adapters and low-quality bases\"]\n  C --&gt; D[\"3. Assmbly&lt;br/&gt;SPAdes&lt;br/&gt;assemble the reads into contigs or scaffolds\"]\n  D --&gt; E[\"4. Identification&lt;br/&gt;Kraken2 or BLAST &lt;br/&gt;which organisms are in the reads? contamination?\"]\n  E --&gt; F[\"5. Assembly quality&lt;br/&gt;QUAST&lt;br/&gt; N50, length, genome fraction\"]\n  classDef qc fill:#dbeafe,stroke:#2b6cb0,color:#16395f;\n  class B,C,D,E qc;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1\nFastQC\nper-base quality, adapters, GC content, duplication\nhtml\n\n\n2\ntrimmomatic\ntrims adapters and low-quality ends, drops short reads\nfastq.gz\n\n\n3\nFastQC + MultiQC\nsame check after trimming; MultiQC merges all samples in one page\nhtml\n\n\n4\nKraken2 +BLAST\nassigns each read to a taxon (virus, human, bacteria…); needs a database\ntxt\n\n\n5\nSPAdes\nbuilds contigs ( --meta for metagenomes)\nfasta\n\n\n6\nQUAST\nassembly statistics, comparison to a reference if you give one\nhtml\n\n\n\nOptional additions: seqkit stats (quick read counts), Prokka / Bakta (gene annotation for bacteria), KrakenTools (keep only the reads of the target virus before assembling).\n\n\n\n\n\n\n\n\n\nImportantSteps you do NOT repeat\n\n\n\nIf you already ran pipeline 1 on the same samples, steps 1 to 3 are already done (FastQC, trimmomatic, MultiQC, Kraken2). Reuse the trimmed reads in results/trimmed/. Only the steps in white below are new.\n\n\n\n\n\n\n\nflowchart TD\n  A[\"Trimmed reads (already done in pipeline 1:&lt;br/&gt;FastQC, trimmomatic, MultiQC)\"] --&gt; B[\"4. Mapping&lt;br/&gt;bwa&lt;br/&gt;align the reads to the reference\"]\n  B --&gt; C[\"5. Sorting&lt;br/&gt;samtools&lt;br/&gt;sorted BAM and mapping statistics\"]\n  C --&gt; D[\"6. Variant calling&lt;br/&gt;freebayes - bcftools &lt;br/&gt;list the variants (VCF)\"]\n  D --&gt; E[\"7. Generate consensus&lt;br/&gt;samtools + ivar &lt;br/&gt;build the genome, mask low depth with N\"]\n  E --&gt; F[\"8. Genome QC&lt;br/&gt;% N, mean depth, negative control\"]\n  F --&gt; G[\"9. Lineage (Pangolin, Nextclade),&lt;br/&gt;MAFFT alignment, IQ-TREE\"]\n  classDef done fill:#e2e8f0,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;\n  class A done;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1–4\nFastQC, trimmomatic, MultiQC, Kraken2\nalready done (see pipeline 1)\nfastq.gz\n\n\n5\nbwa (or minimap2)\naligns each read to the reference\nSAM\n\n\n6\nsamtools\nsorts, indexes and counts mapped reads\nbam, .bai\n\n\n7\nsamtools flagstat / depth / coverage\nhow many reads cover each position\ntxt\n\n\n8\nivar consensus\nmajority base at each position; N where depth is too low\nFASTA\n\n\n9\nfreebayes / bcftools\ncalls SNPs and small indels\nVCF\n\n\n10\nawk / seqkit / summary table\ndecide if the genome is good enough\ncsv\n\n\n11\nPangolin or Nextclade, MAFFT, IQ-TREE\nlineage and phylogeny (modules 2–3)\ntree",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
+    "href": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "",
+    "text": "Both start with the same raw material (FASTQ files) and the same first steps (quality control, trimming, contamination check). They differ in how the genome is rebuilt:\n\nDe novo assembly: reads are stitched together without any reference (new or very divergent virus, bacteria).\nMapping (reference-based): reads are aligned to a known genome, then a consensus is called (known virus: SARS-CoV-2, Rift Valley fever, dengue…).\n\n\n\n\n\n\n\n\nflowchart TD\n  A[\"FASTQ (R1 + R2)\"] --&gt; B[\"1. Quality Control &lt;br/&gt; FastQC &lt;br/&gt;quality of the raw reads\"]\n  B --&gt; C[\"2. Trimming&lt;br/&gt;trimmomatic&lt;br/&gt;remove adapters and low-quality bases\"]\n  C --&gt; D[\"3. Assmbly&lt;br/&gt;SPAdes&lt;br/&gt;assemble the reads into contigs or scaffolds\"]\n  D --&gt; E[\"4. Identification&lt;br/&gt;Kraken2 or BLAST &lt;br/&gt;which organisms are in the reads? contamination?\"]\n  E --&gt; F[\"5. Assembly quality&lt;br/&gt;QUAST&lt;br/&gt; N50, length, genome fraction\"]\n  classDef qc fill:#dbeafe,stroke:#2b6cb0,color:#16395f;\n  class B,C,D,E qc;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1\nFastQC\nper-base quality, adapters, GC content, duplication\nhtml\n\n\n2\ntrimmomatic\ntrims adapters and low-quality ends, drops short reads\nfastq.gz\n\n\n3\nFastQC + MultiQC\nsame check after trimming; MultiQC merges all samples in one page\nhtml\n\n\n4\nKraken2 +BLAST\nassigns each read to a taxon (virus, human, bacteria…); needs a database\ntxt\n\n\n5\nSPAdes\nbuilds contigs ( --meta for metagenomes)\nfasta\n\n\n6\nQUAST\nassembly statistics, comparison to a reference if you give one\nhtml\n\n\n\nOptional additions: seqkit stats (quick read counts), Prokka / Bakta (gene annotation for bacteria), KrakenTools (keep only the reads of the target virus before assembling).\n\n\n\n\n\n\n\n\n\nImportantSteps you do NOT repeat\n\n\n\nIf you already ran pipeline 1 on the same samples, steps 1 to 3 are already done (FastQC, trimmomatic, MultiQC, Kraken2). Reuse the trimmed reads in results/trimmed/. Only the steps in white below are new.\n\n\n\n\n\n\n\nflowchart TD\n  A[\"Trimmed reads (already done in pipeline 1:&lt;br/&gt;FastQC, trimmomatic, MultiQC)\"] --&gt; B[\"4. Mapping&lt;br/&gt;bwa&lt;br/&gt;align the reads to the reference\"]\n  B --&gt; C[\"5. Sorting&lt;br/&gt;samtools&lt;br/&gt;sorted BAM and mapping statistics\"]\n  C --&gt; D[\"6. Variant calling&lt;br/&gt;freebayes - bcftools &lt;br/&gt;list the variants (VCF)\"]\n  D --&gt; E[\"7. Generate consensus&lt;br/&gt;samtools + ivar &lt;br/&gt;build the genome, mask low depth with N\"]\n  E --&gt; F[\"8. Genome QC&lt;br/&gt;% N, mean depth, negative control\"]\n  F --&gt; G[\"9. Lineage (Pangolin, Nextclade),&lt;br/&gt;MAFFT alignment, IQ-TREE\"]\n  classDef done fill:#e2e8f0,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;\n  class A done;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1–4\nFastQC, trimmomatic, MultiQC, Kraken2\nalready done (see pipeline 1)\nfastq.gz\n\n\n5\nbwa (or minimap2)\naligns each read to the reference\nSAM\n\n\n6\nsamtools\nsorts, indexes and counts mapped reads\nbam, .bai\n\n\n7\nsamtools flagstat / depth / coverage\nhow many reads cover each position\ntxt\n\n\n8\nivar consensus\nmajority base at each position; N where depth is too low\nFASTA\n\n\n9\nfreebayes / bcftools\ncalls SNPs and small indels\nVCF\n\n\n10\nawk / seqkit / summary table\ndecide if the genome is good enough\ncsv\n\n\n11\nPangolin or Nextclade, MAFFT, IQ-TREE\nlineage and phylogeny (modules 2–3)\ntree",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#sequencing-technologies",
+    "href": "course/01-concepts.html#sequencing-technologies",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "Sequencing technologies",
+    "text": "Sequencing technologies\n\n\n\n\n\n\n\n\n\nIllumina (short reads)\nOxford Nanopore (long reads)\n\n\n\n\nRead length\ntypically 50–300 bp\nfrom hundreds of bp to tens of kb\n\n\nAccuracy\nvery high per base\nlower per read, improving with chemistry and basecalling\n\n\nOutput\npaired-end reads (R1 + R2)\nsingle long reads, available in real time\n\n\nStrengths\naccurate SNPs, high throughput\nstructural variation, repeats, portable devices, fast turnaround\n\n\nTypical weakness\nrepeats and structural variants\nerrors in homopolymers, need for polishing",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#library-preparation-approaches-viruses",
+    "href": "course/01-concepts.html#library-preparation-approaches-viruses",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "Library preparation approaches (viruses)",
+    "text": "Library preparation approaches (viruses)\n\n\n\n\n\n\n\n\n\nWGS / metagenomics\nAmplicon (e.g. ARTIC)\n\n\n\n\nPrinciple\nsequence everything in the sample\namplify the virus in overlapping tiles (multiplex PCR)\n\n\nBest when\nyou do not know what you are looking for\nroutine viral surveillance (the most common approach)\n\n\nWatch out for\nmost reads may not come from the virus\namplicon dropout when primer sites mutate",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#file-formats",
+    "href": "course/01-concepts.html#file-formats",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "File formats",
+    "text": "File formats\n\n\n\n\n\n\n\n\nFormat\nContent\nCompanion\n\n\n\n\nFASTA\nsequences (reference, consensus)\n.fai index\n\n\nFASTQ\nreads + base qualities (4 lines per read)\n–\n\n\nSAM / BAM / CRAM\nalignments (text / binary / compressed)\n.bai index (BAM must be sorted)\n\n\nVCF\nvariants\n.tbi index when bgzipped\n\n\nBED\nintervals (e.g. low-depth regions)\n–\n\n\ndepth table\ndepth per position\n–\n\n\n\n\nA FASTQ record\n@read_name\nACGTACGT...            sequence\n+\nIIIIHHHHGGGG...        quality, one character per base\nPhred score Q = −10·log10(P error): Q20 → 1 error in 100, Q30 → 1 in 1,000. The character encodes Q + 33.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#mapping-or-de-novo-assembly",
+    "href": "course/01-concepts.html#mapping-or-de-novo-assembly",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "Mapping or de novo assembly?",
+    "text": "Mapping or de novo assembly?\n\n\n\n\n\n\n\n\n\n\nMapping to a reference\nDe novo assembly\nHybrid\n\n\n\n\nPrinciple\nalign reads to a known genome\nrebuild the genome without reference\ncombine short and long reads\n\n\nTools\nbwa, minimap2, iVar, bcftools\nSPAdes, MEGAHIT; Flye, Canu\nUnicycler\n\n\nChoose when\nknown, little-divergent virus; amplicon data\nnew/divergent pathogen, bacteria, rearrangements\nboth read types available\n\n\n\nThree questions to decide: Do I have a good reference? Are my reads long? Is my coverage sufficient?",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#pitfalls-to-remember",
+    "href": "course/01-concepts.html#pitfalls-to-remember",
+    "title": "Sequencing, file formats and assembly strategies",
+    "section": "Pitfalls to remember",
+    "text": "Pitfalls to remember\n\nCross-contamination and barcode bleed between samples (always read the negative control).\nWrong reference or unsuitable lineage.\n\nNext: FASTQ and quality control.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Sequencing, file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "From FASTQ to Outbreak Insights",
+    "section": "",
+    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#the-learning-path",
+    "href": "index.html#the-learning-path",
+    "title": "From FASTQ to Outbreak Insights",
+    "section": "",
+    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "index.html#how-to-work",
+    "href": "index.html#how-to-work",
+    "title": "From FASTQ to Outbreak Insights",
+    "section": "How to work",
+    "text": "How to work\n\nDo the setup once.\nFollow the pages in the order of the left menu; each exercise ends with a question to discuss.\nFill in your answer sheet and, on Day 5, your one-page brief.",
+    "crumbs": [
+      "Home"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html",
+    "href": "course/02-alignment.html",
+    "title": "Multiple sequence alignment",
+    "section": "",
+    "text": "A multiple sequence alignment puts homologous positions in the same column, so that each column can be compared between genomes. Phylogenetics and SNP counting both start from it.\n\nConsensus genomes obtained by mapping are already on the reference coordinates, but genomes downloaded from public databases can have different lengths, insertions and deletions.\nMAFFT is a fast, standard aligner for viral genomes.\nAlways look at the alignment (AliView, Jalview): never trust it blindly.\nColumns full of N or gaps carry no information.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#idea",
+    "href": "course/02-alignment.html#idea",
+    "title": "Multiple sequence alignment",
+    "section": "",
+    "text": "A multiple sequence alignment puts homologous positions in the same column, so that each column can be compared between genomes. Phylogenetics and SNP counting both start from it.\n\nConsensus genomes obtained by mapping are already on the reference coordinates, but genomes downloaded from public databases can have different lengths, insertions and deletions.\nMAFFT is a fast, standard aligner for viral genomes.\nAlways look at the alignment (AliView, Jalview): never trust it blindly.\nColumns full of N or gaps carry no information.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#step-1-put-all-the-genomes-in-one-file",
+    "href": "course/02-alignment.html#step-1-put-all-the-genomes-in-one-file",
+    "title": "Multiple sequence alignment",
+    "section": "Step 1 — Put all the genomes in one file",
+    "text": "Step 1 — Put all the genomes in one file\nWe combine the lineage references downloaded from NCBI Virus and your consensus from the previous exercises. seqkit seq rewrites the file cleanly, and sed renames the header of the consensus.\nmkdir -p results/phylo\nseqkit seq data/ncbi/lineage_refs.clean.fasta &gt; results/phylo/all.fasta\nsed 's/^&gt;.*/&gt;SRR26396743/' results/consensus/SRR26396743.fa | seqkit seq &gt;&gt; results/phylo/all.fasta\ngrep -c '&gt;' results/phylo/all.fasta\ngrep '&gt;' results/phylo/all.fasta\nQuestion: how many sequences are there, and which one is your sample?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe number of references you downloaded plus one (your consensus, named SRR26396743).",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#step-2-check-the-quality-of-each-genome-before-aligning",
+    "href": "course/02-alignment.html#step-2-check-the-quality-of-each-genome-before-aligning",
+    "title": "Multiple sequence alignment",
+    "section": "Step 2 — Check the quality of each genome before aligning",
+    "text": "Step 2 — Check the quality of each genome before aligning\nCount the N in each sequence:\nseqkit fx2tab -n -l -B N results/phylo/all.fasta | awk '{printf \"%s\\t%d bp\\t%d N\\t%.2f%%\\n\", $1, $2, $3, 100*$3/$2}'\nQuestions\n\nWhich genome has the most N?\nIs your sample good enough to be placed on a tree? (remember the exercise Is this genome good enough?)\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own values. A genome with a large percentage of N (the course threshold is 10 %) has a position in the tree that is less reliable, because missing data can make it look closer to some genomes than it really is. If a reference has many N, replace it in NCBI Virus with a better one.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#step-3-align-with-mafft",
+    "href": "course/02-alignment.html#step-3-align-with-mafft",
+    "title": "Multiple sequence alignment",
+    "section": "Step 3 — Align with MAFFT",
+    "text": "Step 3 — Align with MAFFT\nmafft --auto --preservecase --thread 2 results/phylo/all.fasta &gt; results/phylo/aln.fasta\n(--preservecase keeps our upper-case letters. For a few dozen genomes of 30 kb this takes seconds to minutes.)\nseqkit stats results/phylo/aln.fasta\nQuestion: how many sequences and how many alignment columns? Why is the number of columns slightly larger than the genome length?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe number of sequences is the same as in all.fasta. The number of columns is at least the length of the longest genome: when one genome has an insertion or a different start or end, MAFFT adds gaps (-) in the others so that homologous positions stay in the same column.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#step-4-inspect-the-alignment",
+    "href": "course/02-alignment.html#step-4-inspect-the-alignment",
+    "title": "Multiple sequence alignment",
+    "section": "Step 4 — Inspect the alignment",
+    "text": "Step 4 — Inspect the alignment\nOpen results/phylo/aln.fasta in AliView or Jalview (https://www.jalview.org).\nQuestions\n\nAre the ends of the genomes aligned in the same way for all the sequences?\nDo you see blocks of - or N? In which genomes?\nAre the differences between genomes spread over the genome or concentrated in some regions?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nLook at your own alignment. The ends of public genomes are often ragged (different start and stop, or poly-A tails), blocks of N come from regions that were not covered, and differences between lineages are concentrated in some genes (the spike gene carries many lineage-defining changes). Real surveillance pipelines trim the ragged ends and mask known problematic sites before building trees.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-alignment.html#step-5-snp-distances",
+    "href": "course/02-alignment.html#step-5-snp-distances",
+    "title": "Multiple sequence alignment",
+    "section": "Step 5 — SNP distances",
+    "text": "Step 5 — SNP distances\nHow many differences between your sample and each genome? snp-dists ignores N and gaps in each pair:\nsnp-dists -m results/phylo/aln.fasta | awk '$1==\"SRR26396743\" && $2!=\"SRR26396743\"' | sort -k3,3n | column -t\nQuestions\n\nWhich genomes are the closest to your sample, and how many SNPs apart?\nHow many SNPs separate your sample from Wuhan-Hu-1 (NC_045512.2)?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nRead the values in your own table. The closest genomes have the smallest numbers; the distance to Wuhan-Hu-1 gives the amount of evolution since the beginning of the pandemic. Keep this table, we use it for the lineage assignment.\n\n\n\nNext: Lineage assignment.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Multiple sequence alignment"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html",
+    "href": "course/02-reference-selection.html",
+    "title": "Reference selection",
+    "section": "",
+    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Reference selection"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html#why-it-matters",
+    "href": "course/02-reference-selection.html#why-it-matters",
+    "title": "Reference selection",
+    "section": "",
+    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Reference selection"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html#our-sample",
+    "href": "course/02-reference-selection.html#our-sample",
+    "title": "Reference selection",
+    "section": "Our sample",
+    "text": "Our sample\nOur sample is the consensus genome built in the previous exercises from the run SRR26396743:\nls results/consensus/\nseqkit stats results/consensus/SRR26396743.fa\nSince the mapping exercise we have used NC_045512.2 (Wuhan-Hu-1), the RefSeq reference of SARS-CoV-2, as the coordinate system for this sample.\nQuestions: what is the length of the consensus? Why was Wuhan-Hu-1 a good reference to map these reads?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe length should be close to 29.9 kb, that of the SARS-CoV-2 genome. Wuhan-Hu-1 is the RefSeq reference of the right virus, a complete and well-documented genome, and the coordinate system used by the whole community (variant calling, lineage tools, primer schemes).",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Reference selection"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
+    "href": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
+    "title": "Reference selection",
+    "section": "Step 1 — Download references of several lineages from NCBI Virus",
+    "text": "Step 1 — Download references of several lineages from NCBI Virus\nTo place our genome in a tree (next sessions), we need reference genomes of several lineages from the same database. Open NCBI Virus: https://www.ncbi.nlm.nih.gov/labs/virus and choose SARS-CoV-2 (taxid 2697049).\n\nIn the filters on the left, keep Nucleotide completeness: complete and Host: Homo sapiens.\nFilter by Pango lineage (or add the lineage column to the table with Customize columns) and choose one or two genomes per lineage.\nChoose lineages that span the pandemic: the ancestral lineage B (Wuhan-Hu-1, accession NC_045512.2), Alpha (B.1.1.7), Delta (B.1.617.2), Omicron (BA.1, BA.2, BA.5, XBB.1.5) and the lineages circulating when your sample was collected (look at the collection_date of the run SRR26396743 on its NCBI BioSample page).\nPrefer genomes with a full date and country, and with few ambiguous bases.\nSelect about 10–15 genomes, then Download → Nucleotide → FASTA → Build custom, and put Accession and Pango lineage in the definition line. Save the file as data/ncbi/lineage_refs.fasta.\n\nClean the names (no spaces, no |: the tree software does not like them):\nsed '/^&gt;/ { s/[ |][ |]*/_/g; s/_$// }' data/ncbi/lineage_refs.fasta &gt; data/ncbi/lineage_refs.clean.fasta\ngrep '&gt;' data/ncbi/lineage_refs.clean.fasta\nEach name should now look like ACCESSION_LINEAGE. Check that NC_045512.2 is in the list: it will be our root.\nQuestions: how many genomes did you keep? Which criteria did you use to choose them?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe criteria are the table at the top of the page: same species, complete genome, few N, documented (accession, lineage, date, country), and a good spread of lineages and dates so that the tree has meaningful comparisons. One genome per lineage is enough for this exercise; real studies use many more.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Reference selection"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html#final-question",
+    "href": "course/02-reference-selection.html#final-question",
+    "title": "Reference selection",
+    "section": "Final question",
+    "text": "Final question\nWhy should all the samples of a study be mapped to the same reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nBecause differences are measured against the reference, with its coordinates. If each sample used another reference, positions would not correspond, mutations would not be comparable, and differences between references would be mistaken for differences between samples. One common reference = one common coordinate system = genomes you can align and compare.\n\n\n\nNext: Alignment.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Reference selection"
+    ]
+  },
+  {
+    "objectID": "course/03-read-tree.html",
+    "href": "course/03-read-tree.html",
+    "title": "Read a phylogenetic tree",
+    "section": "",
+    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-read-tree.html#anatomy-of-a-tree",
+    "href": "course/03-read-tree.html#anatomy-of-a-tree",
+    "title": "Read a phylogenetic tree",
+    "section": "",
+    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
+    "href": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
+    "title": "Read a phylogenetic tree",
+    "section": "What a tree can and cannot tell",
+    "text": "What a tree can and cannot tell\n\n\n\n\n\n\n\nIt can show\nIt cannot prove\n\n\n\n\nwhich genomes are closely related\nwho infected whom\n\n\nwhether cases form one cluster or several introductions\nthe direction of transmission\n\n\nwhether a lineage spreads across regions\nthat two similar genomes are epidemiologically linked",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-read-tree.html#exercise-read-your-tree",
+    "href": "course/03-read-tree.html#exercise-read-your-tree",
+    "title": "Read a phylogenetic tree",
+    "section": "Exercise — read your tree",
+    "text": "Exercise — read your tree\nOpen your tree in iTOL (results/phylo/tree.treefile), rooted on NC_045512.2 and coloured by lineage as in the previous page. The collection dates and countries of the references are in the table of NCBI Virus (you can add these columns with Customize columns).\nQuestions\n\nWhere is your sample, SRR26396743? Who are its closest relatives?\nDo the references of each lineage form a clade? Is there a lineage that does not?\nWhich part of the tree is the oldest? Check it against the collection dates.\nWhich are the longest branches? What do they mean?\nAre the bootstrap values high around your sample? What does it tell you?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree.\n\nYour sample sits in the clade of the closest reference found in Lineage assignment. If it is next to a reference of a given lineage, that lineage is a good candidate.\nReferences of the same lineage normally group together. A lineage that is split suggests a labelling issue, or too few genomes to resolve it.\nThe oldest genomes (early 2020) are close to the root; the tree order should match the collection dates.\nLong branches mean many substitutions between a genome and its relatives: either a lineage that evolved fast (for example the first Omicron lineages) or a sequence with errors or missing data.\nA bootstrap of 95 or more means that the grouping is well supported. Low values around the sample mean that its position is uncertain: the genome may be incomplete, or the closest references are too similar to be separated.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/03-read-tree.html#final-question",
+    "href": "course/03-read-tree.html#final-question",
+    "title": "Read a phylogenetic tree",
+    "section": "Final question",
+    "text": "Final question\nTwo genomes are identical. List three explanations other than “A infected B”.\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\n\nToo few mutations to tell them apart: viruses change slowly, so unrelated cases can have the same sequence over a short period.\nA common source that infected both without contact between them.\nA common ancestor several steps earlier, with unsampled intermediate cases (you only see part of the chain).\nLaboratory contamination or barcode bleed between the two samples.\nMissing data: identical on the positions that could be compared (N regions hide differences).\n\n\n\n\nNext: Communicating genomic evidence — module 4.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/04-evidence.html",
+    "href": "course/04-evidence.html",
+    "title": "Communicating genomic evidence",
+    "section": "",
+    "text": "A genome analysis is useful only if the person who has to decide (a ministry, a hospital, a field team) understands it and knows how far to trust it. This module is about turning results into clear and honest statements."
+  },
+  {
+    "objectID": "course/04-evidence.html#principles",
+    "href": "course/04-evidence.html#principles",
+    "title": "Communicating genomic evidence",
+    "section": "Principles",
+    "text": "Principles\n\nStart with the question the decision maker asks, and answer it first.\nCombine genomic and epidemiological evidence (dates, places, contacts). Genomes alone rarely prove transmission.\nSay how sure you are, and why.\nShow the limits: sampling bias, low resolution, missing data, excluded genomes.\nMake it reproducible: tool versions, parameters, files."
+  },
+  {
+    "objectID": "course/04-evidence.html#language-of-certainty",
+    "href": "course/04-evidence.html#language-of-certainty",
+    "title": "Communicating genomic evidence",
+    "section": "Language of certainty",
+    "text": "Language of certainty\n\n\n\n\n\n\n\nEvidence\nWording\n\n\n\n\nIdentical or nearly identical genomes, compatible dates and places\n“genomic data are consistent with a common source”\n\n\nSame lineage, no finer resolution\n“we cannot distinguish between local transmission and repeated introductions”\n\n\nDifferent lineages\n“not consistent with a single chain of transmission”\n\n\nLow coverage / many N\n“insufficient data to conclude”\n\n\n\nAvoid: “proves”, “confirms”, “patient X infected patient Y”."
+  },
+  {
+    "objectID": "course/04-evidence.html#a-good-figure",
+    "href": "course/04-evidence.html#a-good-figure",
+    "title": "Communicating genomic evidence",
+    "section": "A good figure",
+    "text": "A good figure\n\none message per figure, and the title states the message (not just “Phylogenetic tree”);\ncolour = a variable the reader cares about (region, lineage), with a legend;\nlabel the sample(s) of interest; the caption gives the number of genomes and the method;\nreadable in grayscale and for colour-blind readers."
+  },
+  {
+    "objectID": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
+    "href": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
+    "title": "Communicating genomic evidence",
+    "section": "Exercise 1 — Rewrite these statements (20 min)",
+    "text": "Exercise 1 — Rewrite these statements (20 min)\nRewrite each sentence so that the data support it.\n\n“The Region C genomes prove the outbreak came from Region A.”\n“S03 is negative for the virus.”\n“The tree shows that S01 infected OB10.”\n\n\n\n\n\n\n\nTipSuggested answers\n\n\n\n\n\n\n“The Region C genomes belong to lineages that descend from the lineage first seen in Region A, which is consistent with an introduction from Region A followed by local transmission. Genomic data alone cannot establish the direction; travel and contact data are needed.” (Why: a tree shows relatedness, not direction; “prove” is too strong.)\n“S03 gave insufficient data (mean depth 5x, 95 % of the genome undetermined, in a run whose negative control had viral reads). The result is inconclusive, not negative: the sample should be re-sequenced.” (Why: a failed sequencing is not a negative test.)\n“S01 and OB10 are closely related (2 SNPs apart) and both belong to the early Region A cluster. This is compatible with a close epidemiological link, but the genomes alone do not show who infected whom.” (Why: no direction; other chains can produce the same pattern.)"
+  },
+  {
+    "objectID": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
+    "href": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
+    "title": "Communicating genomic evidence",
+    "section": "Exercise 2 — Write a key message (15 min)",
+    "text": "Exercise 2 — Write a key message (15 min)\nWrite two sentences that answer: “Where does S01 fit in the outbreak, and how sure are you?”\n\n\n\n\n\n\nTipExample\n\n\n\n\n\n“S01 (Region A, 2 March) belongs to lineage TV.2, the early lineage of the outbreak, and is 2 SNPs from three other early Region A genomes, which is consistent with it being part of the same cluster. The genome is complete (99.4 % covered at ≥ 10x), but with only a few SNPs of difference, the resolution does not allow us to identify direct transmission links.”\n\n\n\nNext: One-page brief template."
+  },
+  {
+    "objectID": "course/05-model-answer.html",
+    "href": "course/05-model-answer.html",
+    "title": "Model answer",
+    "section": "",
+    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
+  },
+  {
+    "objectID": "course/05-model-answer.html#answers-to-the-three-questions",
+    "href": "course/05-model-answer.html#answers-to-the-three-questions",
+    "title": "Model answer",
+    "section": "",
+    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
+  },
+  {
+    "objectID": "course/05-model-answer.html#example-brief-one-page",
+    "href": "course/05-model-answer.html#example-brief-one-page",
+    "title": "Model answer",
+    "section": "Example brief (one page)",
+    "text": "Example brief (one page)\n\nGenomic investigation brief — TOYV1, Regions A–C\nKey message. The Region C cases are consistent with an introduction from Region A in early March followed by local transmission; the older Region B cases belong to a different lineage and are not part of this chain. Confidence: moderate.\nData and quality. 28 genomes received (27 outbreak + S01), 27 analysed. OB24 excluded (23 % N). Reference TOYV1. Negative control: 50 viral reads (barcode bleed); the samples concerned have &gt; 70x and are not affected.\nFindings. Lineage TV.2 first seen in Region A on 1–5 March. In Region C: one early TV.2 genome (12 March), a cluster of 7 TV.2.2 genomes (25 March–26 April) and one TV.2.1 genome (2 April). Region B: TV.3 (5 genomes) and TV.1, 16 SNPs or more from TV.2.\nFigure. Tree of 27 genomes coloured by region (maximum-likelihood, 1,000 ultrafast bootstraps).\nInterpretation. The pattern suggests an introduction followed by local transmission in Region C; the direction of introductions is inferred from dates, not demonstrated by the genomes.\nLimits. Few SNPs (low resolution), small sample, no contact data.\nRecommendations. Sequence more Region C cases and the March cases; collect travel/contact history for the early Region C and TV.2.1 cases; re-sequence samples with insufficient coverage."
+  },
+  {
+    "objectID": "course/05-workflow.html",
+    "href": "course/05-workflow.html",
+    "title": "Suggested workflow",
+    "section": "",
+    "text": "Follow the steps in order; each command is independent, copy and paste them one at a time. Adapt freely. Every step ends with a checkpoint question."
+  },
+  {
+    "objectID": "course/05-workflow.html#quality-filter",
+    "href": "course/05-workflow.html#quality-filter",
+    "title": "Suggested workflow",
+    "section": "1. Quality filter",
+    "text": "1. Quality filter\nHow much of each outbreak genome is missing (N)?\nawk '/^&gt;/{if(name) printf \"%s\\t%.1f%%\\n\", name, 100*n/len; name=substr($0,2); n=0; len=0; next} {n+=gsub(/N/,\"N\"); len+=length($0)} END{printf \"%s\\t%.1f%%\\n\", name, 100*n/len}' data/outbreak/sequences.fasta | sort -k2 -n -r | head -5\nRemove the genomes above 10 % N (here one), and build the dataset with the reference and S01:\nmkdir -p results/outbreak\nsed 's/^&gt;.*/&gt;TOYV1_ref/' data/reference/TOYV1.fasta &gt; results/outbreak/all.fasta\nseqkit grep -v -p OB24 data/outbreak/sequences.fasta &gt;&gt; results/outbreak/all.fasta\ncat results/consensus/S01.fa &gt;&gt; results/outbreak/all.fasta\ngrep -c '&gt;' results/outbreak/all.fasta\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB24 has 23 % N and is the only genome above the threshold: excluded. The dataset has 28 sequences (1 reference + 26 outbreak + S01)."
+  },
+  {
+    "objectID": "course/05-workflow.html#align-and-assign-lineages",
+    "href": "course/05-workflow.html#align-and-assign-lineages",
+    "title": "Suggested workflow",
+    "section": "2. Align and assign lineages",
+    "text": "2. Align and assign lineages\nmafft --auto --preservecase --thread 2 results/outbreak/all.fasta &gt; results/outbreak/aln.fasta\npython3 scripts/13_lineage.py results/outbreak/aln.fasta --out results/outbreak/lineages.tsv\n(Plan B without MAFFT: python3 scripts/11b_align_fallback.py, which uses OB24 too; ignore it or remove it afterwards.)\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nS01 = TV.2. The other genomes fall in TV.1 (3), TV.3 (5), TV.2 (4), TV.2.1 (8), TV.2.2 (6, without OB24)."
+  },
+  {
+    "objectID": "course/05-workflow.html#tree",
+    "href": "course/05-workflow.html#tree",
+    "title": "Suggested workflow",
+    "section": "3. Tree",
+    "text": "3. Tree\niqtree2 -s results/outbreak/aln.fasta -m MFP -B 1000 -T 2 --seed 1 -o TOYV1_ref --prefix results/outbreak/tree -redo\npython3 scripts/14_plot_tree.py results/outbreak/tree.treefile --lineages results/outbreak/lineages.tsv --color region --out results/outbreak/tree_region.png\n(Plan B: precomputed/phylo/tree.nwk and tree_region.png.)"
+  },
+  {
+    "objectID": "course/05-workflow.html#genomics-next-to-epidemiology",
+    "href": "course/05-workflow.html#genomics-next-to-epidemiology",
+    "title": "Suggested workflow",
+    "section": "4. Genomics next to epidemiology",
+    "text": "4. Genomics next to epidemiology\nSort the genomes by date and look at each lineage’s first appearance, place and time:\njoin -t $'\\t' &lt;(sort -k1,1 results/outbreak/lineages.tsv) &lt;(sort -k1,1 data/outbreak/metadata.tsv) | cut -f1,2,4,5 | sort -t$'\\t' -k3,3 | column -t -s $'\\t'\nQuestions: when and where does each lineage first appear? Is any genome out of place (a lineage in an unexpected region)?\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nTV.1 (Jan–Feb, Regions B and D) → TV.3 (Feb–Mar, Region B) → TV.2 first in Region A on 1–5 March → TV.2.1 in Region A (from 20 March) and TV.2.2 in Region C (from 25 March). Out of place: OB22 (TV.2) in Region C on 12 March, and OB14 (TV.2.1) in Region C on 2 April."
+  },
+  {
+    "objectID": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
+    "href": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
+    "title": "Suggested workflow",
+    "section": "5. How far apart are Region C and Region A genomes?",
+    "text": "5. How far apart are Region C and Region A genomes?\npython3 scripts/15_snp_matrix.py results/outbreak/aln.fasta --out results/outbreak/snp_matrix.tsv --ids S01,OB10,OB22,OB14,OB08,OB07,OB23,OB03\ncolumn -t results/outbreak/snp_matrix.tsv\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB22 (Region C, TV.2) is only 1 SNP from OB10 (Region A, early March) and 3 from S01: same early genotype in both regions. The TV.2.2 genomes (OB08, OB07; Region C) are 2 SNPs from each other and 4 from the early TV.2 group. OB14 (Region C, TV.2.1) is 4 SNPs from OB23 (Region A, TV.2.1) but 10 from the Region C TV.2.2 cluster: it is linked to the Region A expansion, not to the local Region C cluster. OB03 (TV.3, Region B) is far from all of them (16 SNPs or more)."
+  },
+  {
+    "objectID": "course/05-workflow.html#interpret-and-write",
+    "href": "course/05-workflow.html#interpret-and-write",
+    "title": "Suggested workflow",
+    "section": "6. Interpret and write",
+    "text": "6. Interpret and write\nUse the certainty wording, the brief template and the deliverable rules. Compare with the model answer only after you wrote yours."
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html",
+    "href": "exercises/01_fastq_and_qc.html",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "",
+    "text": "Goal: Starting from paired-end FASTQ files (R1 + R2), assess sequencing quality, clean the reads, assemble them into contigs, identify which organisms are present (and detect contamination), and evaluate the quality of the assembly.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#workflow-overview",
+    "href": "exercises/01_fastq_and_qc.html#workflow-overview",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Workflow overview",
+    "text": "Workflow overview\n\n\n\n\n\n\n\n\nStage\nTool\nQuestion answered\n\n\n\n\n1. Quality control\nFastQC + MultiQC\nWhat is the quality of the raw reads?\n\n\n2. Trimming\ntrimmomatic\nCan adapters and low-quality bases be removed?\n\n\n3. Assembly\nSPAdes\nCan the reads be assembled into contigs or scaffolds?\n\n\n4. Identification\nKraken2 and/or BLAST\nWhich organisms are in the reads? Is there contamination?\n\n\n5. Assembly quality\nQUAST\nWhat are the N50, total length and genome fraction?\n\n\n\nOpen a terminal in the course folder and activate the environment:\nconda activate analyse\nCheck that all the tools are available:\nfastqc --version && multiqc --version && trimmomatic --version && seqkit version\nspades.py --version && kraken2 --version && blastn -version && quast.py --version\nIf a tool is missing, ask your instructor or install it in the environment, for example conda install -c bioconda quast.\nEach grey box contains a command. Copy it, paste it into the terminal, press Enter, and examine the output before continuing.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-1-look-at-a-read",
+    "href": "exercises/01_fastq_and_qc.html#step-1-look-at-a-read",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 1 — Look at a read",
+    "text": "Step 1 — Look at a read\nA FASTQ file stores four lines per read: the read identifier, nucleotide sequence, a + separator, and a quality string. The files are compressed (.gz), so we use zcat.\nzcat data/SRR26396743_1.fastq.gz | head -4\nQuestions\n\nWhich line contains the nucleotide sequence? Which contains the quality scores?\nWhat does each character in the quality string represent?\n\n\n\n\n\n\n\nTipAnswers\n\n\n\n\n\n\nLine 1 is the read identifier, line 2 is the nucleotide sequence, line 3 is +, and line 4 contains the quality string.\nEach quality character encodes the estimated confidence in the corresponding base.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-2-quality-control-of-the-raw-reads-fastqc-multiqc",
+    "href": "exercises/01_fastq_and_qc.html#step-2-quality-control-of-the-raw-reads-fastqc-multiqc",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 2 — Quality control of the raw reads (FastQC + MultiQC)",
+    "text": "Step 2 — Quality control of the raw reads (FastQC + MultiQC)\nFastQC analyzes individual FASTQ files and produces HTML reports. MultiQC combines the results into a single report.\nCreate an output directory:\nmkdir -p results/qc_raw\nRun FastQC:\nfastqc -t 2 -o results/qc_raw data/SRR26396743_*.fastq.gz\nCombine the reports:\nmultiqc results/qc_raw -o results/qc_raw\nOpen the report in your browser:\nopen results/qc_raw/multiqc_report.html\nOn Linux, you can use:\nxdg-open results/qc_raw/multiqc_report.html\nExamine three sections:\n\nGeneral Statistics: number of reads, sequence length, and overall quality indicators.\nPer base sequence quality: quality distribution along the reads.\nAdapter Content: evidence of adapter sequences remaining in the reads.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-3-trim-reads-with-trimmomatic",
+    "href": "exercises/01_fastq_and_qc.html#step-3-trim-reads-with-trimmomatic",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 3 — Trim reads with trimmomatic",
+    "text": "Step 3 — Trim reads with trimmomatic\ntrimmomatic can detect adapters in paired-end data, trim low-quality tails, filter short reads.\nCreate the output directories:\nmkdir -p results/trimmed results/trimmomatic\nRun trimmomatic:\ntrimmomatic PE \\\n  -threads 2 \\\n  -phred33 \\\n  data/SRR26396743_1.fastq \\\n  data/SRR26396743_2.fastq \\\n  results/trimmed/SRR26396743_1_paired.fastq.gz \\\n  results/trimmed/SRR26396743_1_unpaired.fastq.gz \\\n  results/trimmed/SRR26396743_2_paired.fastq.gz \\\n  results/trimmed/SRR26396743_2_unpaired.fastq.gz \\\n  TRAILING:20 \\\n  SLIDINGWINDOW:4:20 \\\n  MINLEN:50\nWhat do the options mean?\n\nPE: Processes paired-end reads.\n-threads 2: Uses two CPU threads.\n-phred33: Specifies the Phred+33 quality score encoding.\nTRAILING:20: Removes low-quality bases from the ends of reads when their quality score is below 20.\nSLIDINGWINDOW:4:20: Trims a read when the average quality score in a four-base sliding window falls below 20.\nMINLEN:50: Discards reads shorter than 50 bases after trimming.\npaired: Output files containing reads whose mates both pass filtering.\nunpaired: Output files containing reads whose mates do not both pass filtering.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-4-check-the-trimmed-reads",
+    "href": "exercises/01_fastq_and_qc.html#step-4-check-the-trimmed-reads",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 4 — Check the trimmed reads",
+    "text": "Step 4 — Check the trimmed reads\nRun FastQC on the cleaned files:\nmkdir -p results/qc_trimmed\nfastqc -t 2 -o results/qc_trimmed results/trimmed/*.fastq.gz\nCombine the reports:\nmultiqc results/qc_trimmed -o results/qc_trimmed\nOpen the report:\nopen results/qc_trimmed/multiqc_report.html\nCompare the raw and trimmed reports.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-5-assemble-the-reads-with-spades",
+    "href": "exercises/01_fastq_and_qc.html#step-5-assemble-the-reads-with-spades",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 5 — Assemble the reads with SPAdes",
+    "text": "Step 5 — Assemble the reads with SPAdes\nAn assembler joins overlapping reads into longer sequences called contigs. When paired-end information links contigs together, they can be ordered into scaffolds. SPAdes builds a de Bruijn graph from the reads and uses the R1/R2 pairing to resolve ambiguities.\nRun SPAdes on the trimmed reads:\nspades.py \\\n  -1 results/trimmed/SRR26396743_1.fastq.gz \\\n  -2 results/trimmed/SRR26396743_2.fastq.gz \\\n  --meta \\\n  -t 2 \\\n  -o results/spades\n\n\n\nOption\nPurpose\n\n\n\n\n-1, -2\nTrimmed R1 and R2 files (paired reads)\n\n\n--meta\nmetagenomic mode\n\n\n-t 2\nUse two threads\n\n\n-o\nOutput directory\n\n\n\nWhen SPAdes finishes, look at the output folder:\nls results/spades\nThe main files are:\n\ncontigs.fasta: assembled contigs\nscaffolds.fasta: contigs linked into scaffolds using paired-end information\nspades.log: log of the run\n\nList the five longest contigs:\nseqkit sort -l -r results/spades/contigs.fasta | seqkit fx2tab -n -l | head -5\n\n\n\n\n\n\nTipresult\n\n\n\n\n\n\n\n\nMetric\nContigs\nScaffolds\n\n\n\n\nNumber of sequences\n14\n12\n\n\nTotal length (bp)\n30,249\n30,449\n\n\nLongest sequence (bp)\n12,657\n21,827\n\n\nN50 (bp)\n9,070\n21,827\n\n\nN50_num\n2\n1\n\n\nNumber of N bases\n0\n200",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-6-which-organisms-are-in-the-reads-kraken2-or-blast",
+    "href": "exercises/01_fastq_and_qc.html#step-6-which-organisms-are-in-the-reads-kraken2-or-blast",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 6 — Which organisms are in the reads? (Kraken2 or BLAST)",
+    "text": "Step 6 — Which organisms are in the reads? (Kraken2 or BLAST)\nAssembling is not enough: we must verify that the sequences really come from the expected organism, and detect possible contamination (human DNA, bacteria, other viruses). Two complementary approaches are available.\n\nOption A — Kraken2 on the reads\nKraken2 assigns a taxonomic label to each read by comparing its k-mers to a reference database. It is fast and gives an overview of all the organisms in the sample.\nCreate the output directory:\nmkdir -p results/kraken2\nRun Kraken2 on the trimmed read pairs. Replace db/kraken2 with the path of the Kraken2 database provided for the course:\nkraken2 \\\n  --db db/kraken2 \\\n  --paired \\\n  --gzip-compressed \\\n  --threads 2 \\\n  --report results/kraken2/SRR26396743.report \\\n  --output results/kraken2/SRR26396743.kraken \\\n  results/trimmed/SRR26396743_1.fastq.gz \\\n  results/trimmed/SRR26396743_2.fastq.gz\nLook at the taxonomic summary:\nhead -20 results/kraken2/SRR26396743.report\nThe report has six columns: percentage of reads in the clade, number of reads in the clade, number of reads assigned directly to the taxon, rank code (U unclassified, D domain, G genus, S species, …), NCBI taxonomy ID, and scientific name.\nShow only the species-level lines, sorted by percentage:\nawk '$4==\"S\"' results/kraken2/SRR26396743.report | sort -k1,1nr | head -10\nNote: a complete Kraken2 database (e.g. Standard) is very large. For this practical, a small database (such as a viral or MiniKraken index) is sufficient. Indexes are listed at https://benlangmead.github.io/aws-indexes/k2.\n\n\nOption B — BLAST on the contigs\nBLAST aligns a sequence against a reference database and reports the best matches. It is slower but more precise, and works well on a few long contigs.\nExtract the longest contig:\nseqkit sort -l -r results/spades/contigs.fasta | seqkit head -n 1 &gt; results/spades/longest_contig.fasta\nRun blastn against the NCBI nucleotide database (remote search, internet connection required):\nblastn \\\n  -query results/spades/longest_contig.fasta \\\n  -db nt \\\n  -remote \\\n  -max_target_seqs 5 \\\n  -outfmt \"6 qseqid sseqid stitle pident length evalue bitscore\" \\\n  -out results/spades/longest_contig.blast.tsv\ncat results/spades/longest_contig.blast.tsv\nThe columns are: query ID, subject ID, subject title, percent identity, alignment length, E-value, and bit score.\nYou can also paste the sequence into the web interface: https://blast.ncbi.nlm.nih.gov/Blast.cgi (choose Nucleotide BLAST).",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-7-evaluate-the-assembly-with-quast",
+    "href": "exercises/01_fastq_and_qc.html#step-7-evaluate-the-assembly-with-quast",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 7 — Evaluate the assembly with QUAST",
+    "text": "Step 7 — Evaluate the assembly with QUAST\nQUAST computes statistics describing an assembly. When a reference genome is provided, it also measures how much of the reference is covered by the assembly.\nCreate the output directory and run QUAST. Replace the reference path with the SARS-CoV-2 reference genome (NC_045512.2) provided in the course folder:\nmkdir -p results/quast\nquast.py \\\n  results/spades/contigs.fasta \\\n  results/spades/scaffolds.fasta \\\n  -r data/reference/NC_045512.2.fasta \\\n  --min-contig 200 \\\n  -t 2 \\\n  -o results/quast\n\n\n\n\n\n\n\nOption\nPurpose\n\n\n\n\n-r\nReference genome (needed for genome fraction, misassemblies, NGA50)\n\n\n--min-contig 200\nIgnore contigs shorter than 200 bp\n\n\n-t 2\nUse two threads\n\n\n-o\nOutput directory\n\n\n\nDisplay the text report and open the HTML report:\ncat results/quast/report.txt\nopen results/quast/report.html\nKey metrics:\n\n\n\n\n\n\n\nMetric\nMeaning\n\n\n\n\n# contigs\nNumber of contigs (fewer is generally better)\n\n\nLargest contig\nLength of the longest contig\n\n\nTotal length\nSum of all contig lengths\n\n\nN50\nLength such that contigs of at least this size contain 50% of the assembly\n\n\nL50\nNumber of contigs needed to reach 50% of the assembly\n\n\nGenome fraction (%)\nPercentage of the reference covered by the assembly\n\n\n# misassemblies\nContigs that do not align consistently to the reference\n\n\n# N's per 100 kbp\nAmount of undefined bases (gaps)",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/01_fastq_and_qc.html#step-8-summarize-your-results",
+    "href": "exercises/01_fastq_and_qc.html#step-8-summarize-your-results",
+    "title": "From FASTQ to assembly: QC, trimming, assembly and identification",
+    "section": "Step 8 — Summarize your results",
+    "text": "Step 8 — Summarize your results\nComplete this table with your own values:\n\n\n\nStage\nMetric\nValue\n\n\n\n\nRaw reads\nRead pairs\n\n\n\nRaw reads\nAdapter content detected?\n\n\n\nTrimming\nRead pairs after trimmomatic\n\n\n\nTrimming\nQ30 rate after filtering\n\n\n\nAssembly\nNumber of contigs\n\n\n\nAssembly\nLongest contig (bp)\n\n\n\nIdentification\nDominant species (Kraken2 / BLAST)\n\n\n\nIdentification\nContamination detected?\n\n\n\nAssembly quality\nN50\n\n\n\nAssembly quality\nGenome fraction (%)\n\n\n\n\nNext: Mapping.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "From FASTQ to assembly: QC, trimming, assembly and identification"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html",
+    "href": "exercises/03_coverage_consensus.html",
+    "title": "Coverage and consensus",
+    "section": "",
+    "text": "Goal: Measure genome coverage, identify low-depth regions, build a consensus genome, and identify candidate variants.\nWe will analyze the SARS-CoV-2 sequencing run SRR26396743 from NCBI, using the trimmed reads and BAM file generated in the previous sessions.\nInput files\nIf a previous step failed, use the corresponding precomputed files provided with the course, if available.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-1-calculate-depth-at-every-position",
+    "href": "exercises/03_coverage_consensus.html#step-1-calculate-depth-at-every-position",
+    "title": "Coverage and consensus",
+    "section": "Step 1 — Calculate depth at every position",
+    "text": "Step 1 — Calculate depth at every position\nDepth is the number of reads covering a reference position. We use -a to include positions with zero coverage.\nCreate the output directories:\nmkdir -p results/coverage results/consensus results/variants\nCalculate the depth:\nsamtools depth -aa \\\n  results/bam/SRR26396743.bam \\\n  &gt; results/coverage/SRR26396743.depth.tsv\nInspect the first three lines:\nhead -3 results/coverage/SRR26396743.depth.tsv\nThe output contains three columns:\n\nReference sequence name\nPosition\nRead depth\n\nObtain a summary with Samtools:\nsamtools coverage results/bam/SRR26396743.bam\nQuestions\n\nWhat is the depth at the first three reference positions?\nAre there positions with zero coverage?\nWhat are the mean depth and percentage of the reference covered by at least one read?\n\nAnswer\nThe depth varies along the genome. A position with zero coverage has no aligned reads supporting a base call. The summary values must be obtained from your own output.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-2-calculate-mean-depth-and-genome-breadth-at-10",
+    "href": "exercises/03_coverage_consensus.html#step-2-calculate-mean-depth-and-genome-breadth-at-10",
+    "title": "Coverage and consensus",
+    "section": "Step 2 — Calculate mean depth and genome breadth at ≥10×",
+    "text": "Step 2 — Calculate mean depth and genome breadth at ≥10×\nFor this exercise, we will use 10× depth as a practical threshold for assessing genome completeness.\n\nMean depth: average number of reads covering each reference position.\nBreadth at ≥10×: percentage of reference positions covered by at least 10 reads.\n\nRun:\nawk '{\n  total += $3\n  if ($3 &gt;= 10) covered++\n  positions++\n}\nEND {\n  if (positions &gt; 0) {\n    printf \"Mean depth: %.1f\\n\", total/positions\n    printf \"Genome at &gt;=10x: %.1f%%\\n\", 100*covered/positions\n  }\n}' results/coverage/SRR26396743.depth.tsv\nQuestions\n\nWhat is the mean depth?\nWhat percentage of the genome has at least 10× coverage?\nDoes the mean depth alone tell you whether the genome is complete?\n\nAnswer\nNo. A high mean depth can coexist with poorly covered regions. Always examine both mean depth and breadth of coverage.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-3-identify-low-depth-regions",
+    "href": "exercises/03_coverage_consensus.html#step-3-identify-low-depth-regions",
+    "title": "Coverage and consensus",
+    "section": "Step 3 — Identify low-depth regions",
+    "text": "Step 3 — Identify low-depth regions\nWe will identify consecutive positions with depth below 10× and report them as intervals.\nawk 'BEGIN {OFS=\"\\t\"}\n{\n  if ($3 &lt; 10) {\n    if (!on) {\n      start = $2\n      on = 1\n    }\n    end = $2\n  } else if (on) {\n    print $1, start-1, end\n    on = 0\n  }\n}\nEND {\n  if (on) print $1, start-1, end\n}' results/coverage/SRR26396743.depth.tsv \\\n  &gt; results/coverage/SRR26396743.low_depth.bed\nInspect the intervals:\ncat results/coverage/SRR26396743.low_depth.bed\nEach line contains the reference name, interval start, and interval end in BED format.\nQuestions\n\nHow many low-depth intervals were identified?\nWhat are their coordinates?\nWhich interval is the longest?\nAre the low-depth regions located near the ends of the genome or in internal regions?\n\nAnswer\nUse the generated BED file to identify the actual intervals. Low coverage near the genome ends can result from limitations in library preparation, read trimming, or the sequencing design. Internal gaps can have several causes, including uneven coverage, amplicon dropout, or local alignment issues. Coverage alone does not establish the cause.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-4-visualize-coverage-in-igv",
+    "href": "exercises/03_coverage_consensus.html#step-4-visualize-coverage-in-igv",
+    "title": "Coverage and consensus",
+    "section": "Step 4 — Visualize coverage in IGV",
+    "text": "Step 4 — Visualize coverage in IGV\nOpen IGV and load:\n\nReference: data/ncbi/SARS-CoV-2_NC_045512.2.fasta\nAlignment: results/bam/SRR26396743.bam\n\nInspect one of the low-depth intervals identified in Step 3.\nQuestions\n\nIs coverage uniform across the region?\nIs the region completely uncovered or only poorly covered?\nDo reads stop abruptly at a particular coordinate?\nWhat additional information would help determine why the region has low coverage?\n\nAnswer\nIGV helps distinguish a complete coverage gap from a region with reduced depth. The shape of the coverage profile may suggest a technical issue, but further information about the library preparation and sequencing protocol is needed to establish the cause.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-5-build-the-consensus-genome-with-ivar",
+    "href": "exercises/03_coverage_consensus.html#step-5-build-the-consensus-genome-with-ivar",
+    "title": "Coverage and consensus",
+    "section": "Step 5 — Build the consensus genome with iVar",
+    "text": "Step 5 — Build the consensus genome with iVar\nA consensus genome represents the most strongly supported nucleotide at each reference position, subject to the calling thresholds.\nHere, we will use:\n\nMinimum base quality: Q20\nMinimum depth: 10 reads\nMinimum proportion of reads supporting a base: 50%\nMissing or insufficiently supported positions: N\n\nRun samtools mpileup and pass its output to ivar consensus:\nsamtools mpileup \\\n  -aa -A -d 0 -Q 0 \\\n  -f data/ncbi/SARS-CoV-2_NC_045512.2.fasta \\\n  results/bam/SRR26396743.bam \\\n  | ivar consensus \\\n      -p results/consensus/SRR26396743 \\\n      -q 20 \\\n      -t 0.5 \\\n      -m 10 \\\n      -n N\nThis produces a consensus FASTA file, normally named:\nresults/consensus/SRR26396743.fa\nInspect its header and sequence:\nhead -c 300 results/consensus/SRR26396743.fa\nQuestions\n\nWhat is the length of the consensus?\nWhy are some positions represented by N?\nWhat happens when a position has fewer than 10 reads?\nDoes a consensus sequence necessarily represent a perfect reconstruction of the original viral genome?\n\nAnswer\nA consensus can contain N where the evidence is insufficient under the selected thresholds. It is an estimate derived from the available reads, not a guarantee of a perfectly reconstructed genome.\nThe consensus quality depends on depth, base quality, mapping quality, the consensus thresholds, and the quality of the underlying sequencing data.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-6-measure-the-number-of-ambiguous-bases",
+    "href": "exercises/03_coverage_consensus.html#step-6-measure-the-number-of-ambiguous-bases",
+    "title": "Coverage and consensus",
+    "section": "Step 6 — Measure the number of ambiguous bases",
+    "text": "Step 6 — Measure the number of ambiguous bases\nCount the number of N bases:\ngrep -v '^&gt;' results/consensus/SRR26396743.fa \\\n  | tr -cd 'N' \\\n  | wc -c\nCalculate the percentage of the consensus represented by N:\nawk '\n  /^&gt;/ {next}\n  {\n    n += gsub(/N/, \"&\")\n    length_total += length($0)\n  }\n  END {\n    if (length_total &gt; 0)\n      printf \"N bases: %d\\nN percentage: %.2f%%\\n\",\n             n, 100*n/length_total\n  }\n' results/consensus/SRR26396743.fa\nFind the longest consecutive run of N bases:\ngrep -v '^&gt;' results/consensus/SRR26396743.fa \\\n  | tr -d '\\n' \\\n  | grep -o 'N\\+' \\\n  | awk '{print length}' \\\n  | sort -n \\\n  | tail -1\nIf no N bases are present, the last command produces no output; interpret that as zero.\nQuestions\n\nHow many N bases are present?\nWhat percentage of the consensus is ambiguous?\nWhat is the longest consecutive run of N?\nWhere are the longest ambiguous regions located?\n\nAnswer\nAll values should be measured from the generated consensus. A large number of N bases or a long consecutive run indicates regions that cannot be confidently resolved with the chosen thresholds.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-7-identify-candidate-variants-with-bcftools",
+    "href": "exercises/03_coverage_consensus.html#step-7-identify-candidate-variants-with-bcftools",
+    "title": "Coverage and consensus",
+    "section": "Step 7 — Identify candidate variants with bcftools",
+    "text": "Step 7 — Identify candidate variants with bcftools\nWe will compare the aligned reads with the reference to identify candidate single-nucleotide variants and short insertions or deletions.\nGenerate a VCF file:\nbcftools mpileup \\\n  -f data/ncbi/SARS-CoV-2_NC_045512.2.fasta \\\n  -Q 20 \\\n  -d 1000000 \\\n  -a AD \\\n  results/bam/SRR26396743.bam \\\n  | bcftools call \\\n      -mv \\\n      --ploidy 1 \\\n      -Oz \\\n      -o results/variants/SRR26396743.vcf.gz\nIndex the VCF:\nbcftools index results/variants/SRR26396743.vcf.gz\nDisplay the variant records:\nbcftools view -H results/variants/SRR26396743.vcf.gz \\\n  | cut -f1,2,4,5,6\nThe columns displayed are:\n\nReference sequence\nPosition\nReference allele\nAlternative allele\nVariant quality (QUAL)\n\nCount the reported variant records:\nbcftools view -H results/variants/SRR26396743.vcf.gz \\\n  | wc -l\nQuestions\n\nHow many variant records were reported?\nWhich reference positions contain candidate variants?\nDo the variants have good read support?\nCan you confirm that a variant is real based only on its presence in the VCF?\n\nAnswer\nThe VCF contains candidate variants identified by the caller. Each candidate must be interpreted using its read depth, allele support, base quality, mapping quality, and alignment context.\nA variant record is not automatically proof of a biological mutation. Examine suspicious calls in IGV and apply suitable quality filters before downstream analyses.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#step-8-change-the-consensus-depth-threshold",
+    "href": "exercises/03_coverage_consensus.html#step-8-change-the-consensus-depth-threshold",
+    "title": "Coverage and consensus",
+    "section": "Step 8 — Change the consensus depth threshold",
+    "text": "Step 8 — Change the consensus depth threshold\nA higher minimum depth can make the consensus more conservative, but it can also increase the number of ambiguous bases.\nBuild a second consensus requiring at least 30 reads per position:\nsamtools mpileup \\\n  -aa -A -d 0 -Q 0 \\\n  -f data/ncbi/SARS-CoV-2_NC_045512.2.fasta \\\n  results/bam/SRR26396743.bam \\\n  | ivar consensus \\\n      -p results/consensus/SRR26396743.m30 \\\n      -q 20 \\\n      -t 0.5 \\\n      -m 30 \\\n      -n N\nCount the ambiguous bases in the second consensus:\ngrep -v '^&gt;' results/consensus/SRR26396743.m30.fa \\\n  | tr -cd 'N' \\\n  | wc -c\nCompare the results with the consensus generated at 10×.\nQuestions\n\nDid the number of N bases change?\nDid the consensus become more or less complete?\nWhy might a laboratory choose a higher depth threshold?\n\nAnswer\nA higher threshold may increase the number of ambiguous bases because positions supported by 10–29 reads no longer meet the minimum-depth requirement. This illustrates the trade-off between the completeness of the consensus and the strictness of the calling criteria.\nA suitable threshold depends on the sequencing protocol, the intended use, and the laboratory’s validated quality criteria.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  },
+  {
+    "objectID": "exercises/03_coverage_consensus.html#final-question",
+    "href": "exercises/03_coverage_consensus.html#final-question",
+    "title": "Coverage and consensus",
+    "section": "Final question",
+    "text": "Final question\nThe genome has a mean depth of 100×, but 15% of its positions have zero coverage. Can you consider the consensus complete?\nAnswer\nNo. Mean depth is an average and can conceal large coverage gaps. Assess mean depth, breadth at relevant thresholds, low-depth intervals, and the number and distribution of N bases before deciding whether a consensus is suitable for its intended purpose.\nNext: Is this genome good enough?",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Coverage and consensus"
+    ]
+  }
+]
