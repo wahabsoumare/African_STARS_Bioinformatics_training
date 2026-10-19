@@ -209,279 +209,225 @@
     ]
   },
   {
-    "objectID": "course/05-scenario.html",
-    "href": "course/05-scenario.html",
-    "title": "Scenario and data",
+    "objectID": "course/05-workflow.html",
+    "href": "course/05-workflow.html",
+    "title": "Suggested workflow",
     "section": "",
-    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
+    "text": "Follow the steps in order; each command is independent, copy and paste them one at a time. Adapt freely. Every step ends with a checkpoint question."
   },
   {
-    "objectID": "course/05-scenario.html#the-situation",
-    "href": "course/05-scenario.html#the-situation",
-    "title": "Scenario and data",
+    "objectID": "course/05-workflow.html#quality-filter",
+    "href": "course/05-workflow.html#quality-filter",
+    "title": "Suggested workflow",
+    "section": "1. Quality filter",
+    "text": "1. Quality filter\nHow much of each outbreak genome is missing (N)?\nawk '/^&gt;/{if(name) printf \"%s\\t%.1f%%\\n\", name, 100*n/len; name=substr($0,2); n=0; len=0; next} {n+=gsub(/N/,\"N\"); len+=length($0)} END{printf \"%s\\t%.1f%%\\n\", name, 100*n/len}' data/outbreak/sequences.fasta | sort -k2 -n -r | head -5\nRemove the genomes above 10 % N (here one), and build the dataset with the reference and S01:\nmkdir -p results/outbreak\nsed 's/^&gt;.*/&gt;TOYV1_ref/' data/reference/TOYV1.fasta &gt; results/outbreak/all.fasta\nseqkit grep -v -p OB24 data/outbreak/sequences.fasta &gt;&gt; results/outbreak/all.fasta\ncat results/consensus/S01.fa &gt;&gt; results/outbreak/all.fasta\ngrep -c '&gt;' results/outbreak/all.fasta\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB24 has 23 % N and is the only genome above the threshold: excluded. The dataset has 28 sequences (1 reference + 26 outbreak + S01)."
+  },
+  {
+    "objectID": "course/05-workflow.html#align-and-assign-lineages",
+    "href": "course/05-workflow.html#align-and-assign-lineages",
+    "title": "Suggested workflow",
+    "section": "2. Align and assign lineages",
+    "text": "2. Align and assign lineages\nmafft --auto --preservecase --thread 2 results/outbreak/all.fasta &gt; results/outbreak/aln.fasta\npython3 scripts/13_lineage.py results/outbreak/aln.fasta --out results/outbreak/lineages.tsv\n(Plan B without MAFFT: python3 scripts/11b_align_fallback.py, which uses OB24 too; ignore it or remove it afterwards.)\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nS01 = TV.2. The other genomes fall in TV.1 (3), TV.3 (5), TV.2 (4), TV.2.1 (8), TV.2.2 (6, without OB24)."
+  },
+  {
+    "objectID": "course/05-workflow.html#tree",
+    "href": "course/05-workflow.html#tree",
+    "title": "Suggested workflow",
+    "section": "3. Tree",
+    "text": "3. Tree\niqtree2 -s results/outbreak/aln.fasta -m MFP -B 1000 -T 2 --seed 1 -o TOYV1_ref --prefix results/outbreak/tree -redo\npython3 scripts/14_plot_tree.py results/outbreak/tree.treefile --lineages results/outbreak/lineages.tsv --color region --out results/outbreak/tree_region.png\n(Plan B: precomputed/phylo/tree.nwk and tree_region.png.)"
+  },
+  {
+    "objectID": "course/05-workflow.html#genomics-next-to-epidemiology",
+    "href": "course/05-workflow.html#genomics-next-to-epidemiology",
+    "title": "Suggested workflow",
+    "section": "4. Genomics next to epidemiology",
+    "text": "4. Genomics next to epidemiology\nSort the genomes by date and look at each lineage’s first appearance, place and time:\njoin -t $'\\t' &lt;(sort -k1,1 results/outbreak/lineages.tsv) &lt;(sort -k1,1 data/outbreak/metadata.tsv) | cut -f1,2,4,5 | sort -t$'\\t' -k3,3 | column -t -s $'\\t'\nQuestions: when and where does each lineage first appear? Is any genome out of place (a lineage in an unexpected region)?\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nTV.1 (Jan–Feb, Regions B and D) → TV.3 (Feb–Mar, Region B) → TV.2 first in Region A on 1–5 March → TV.2.1 in Region A (from 20 March) and TV.2.2 in Region C (from 25 March). Out of place: OB22 (TV.2) in Region C on 12 March, and OB14 (TV.2.1) in Region C on 2 April."
+  },
+  {
+    "objectID": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
+    "href": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
+    "title": "Suggested workflow",
+    "section": "5. How far apart are Region C and Region A genomes?",
+    "text": "5. How far apart are Region C and Region A genomes?\npython3 scripts/15_snp_matrix.py results/outbreak/aln.fasta --out results/outbreak/snp_matrix.tsv --ids S01,OB10,OB22,OB14,OB08,OB07,OB23,OB03\ncolumn -t results/outbreak/snp_matrix.tsv\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB22 (Region C, TV.2) is only 1 SNP from OB10 (Region A, early March) and 3 from S01: same early genotype in both regions. The TV.2.2 genomes (OB08, OB07; Region C) are 2 SNPs from each other and 4 from the early TV.2 group. OB14 (Region C, TV.2.1) is 4 SNPs from OB23 (Region A, TV.2.1) but 10 from the Region C TV.2.2 cluster: it is linked to the Region A expansion, not to the local Region C cluster. OB03 (TV.3, Region B) is far from all of them (16 SNPs or more)."
+  },
+  {
+    "objectID": "course/05-workflow.html#interpret-and-write",
+    "href": "course/05-workflow.html#interpret-and-write",
+    "title": "Suggested workflow",
+    "section": "6. Interpret and write",
+    "text": "6. Interpret and write\nUse the certainty wording, the brief template and the deliverable rules. Compare with the model answer only after you wrote yours."
+  },
+  {
+    "objectID": "course/05-model-answer.html",
+    "href": "course/05-model-answer.html",
+    "title": "Model answer",
     "section": "",
-    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
+    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
   },
   {
-    "objectID": "course/05-scenario.html#data",
-    "href": "course/05-scenario.html#data",
-    "title": "Scenario and data",
-    "section": "Data",
-    "text": "Data\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ndata/outbreak/sequences.fasta\n27 consensus genomes (OB01–OB27)\n\n\ndata/outbreak/metadata.tsv\ncollection date and region\n\n\ndata/outbreak/lineage_definitions.tsv\nthe lineage nomenclature\n\n\ndata/reference/TOYV1.fasta\nthe reference\n\n\nyour S01 consensus\nfrom module 1 (precomputed/consensus/S01.fa as plan B)"
-  },
-  {
-    "objectID": "course/05-scenario.html#rules",
-    "href": "course/05-scenario.html#rules",
-    "title": "Scenario and data",
-    "section": "Rules",
-    "text": "Rules\n\nWork in pairs, 3 hours in total.\nYou may use any script from the course.\nExplain every exclusion.\nThe deliverable is a one-page brief with one figure."
-  },
-  {
-    "objectID": "course/05-deliverable.html",
-    "href": "course/05-deliverable.html",
-    "title": "Deliverable and assessment",
+    "objectID": "course/05-model-answer.html#answers-to-the-three-questions",
+    "href": "course/05-model-answer.html#answers-to-the-three-questions",
+    "title": "Model answer",
     "section": "",
-    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
+    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
   },
   {
-    "objectID": "course/05-deliverable.html#what-to-hand-in",
-    "href": "course/05-deliverable.html#what-to-hand-in",
-    "title": "Deliverable and assessment",
+    "objectID": "course/05-model-answer.html#example-brief-one-page",
+    "href": "course/05-model-answer.html#example-brief-one-page",
+    "title": "Model answer",
+    "section": "Example brief (one page)",
+    "text": "Example brief (one page)\n\nGenomic investigation brief — TOYV1, Regions A–C\nKey message. The Region C cases are consistent with an introduction from Region A in early March followed by local transmission; the older Region B cases belong to a different lineage and are not part of this chain. Confidence: moderate.\nData and quality. 28 genomes received (27 outbreak + S01), 27 analysed. OB24 excluded (23 % N). Reference TOYV1. Negative control: 50 viral reads (barcode bleed); the samples concerned have &gt; 70x and are not affected.\nFindings. Lineage TV.2 first seen in Region A on 1–5 March. In Region C: one early TV.2 genome (12 March), a cluster of 7 TV.2.2 genomes (25 March–26 April) and one TV.2.1 genome (2 April). Region B: TV.3 (5 genomes) and TV.1, 16 SNPs or more from TV.2.\nFigure. Tree of 27 genomes coloured by region (maximum-likelihood, 1,000 ultrafast bootstraps).\nInterpretation. The pattern suggests an introduction followed by local transmission in Region C; the direction of introductions is inferred from dates, not demonstrated by the genomes.\nLimits. Few SNPs (low resolution), small sample, no contact data.\nRecommendations. Sequence more Region C cases and the March cases; collect travel/contact history for the early Region C and TV.2.1 cases; re-sequence samples with insufficient coverage."
+  },
+  {
+    "objectID": "course/04-evidence.html",
+    "href": "course/04-evidence.html",
+    "title": "Communicating genomic evidence",
     "section": "",
-    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
+    "text": "A genome analysis is useful only if the person who has to decide (a ministry, a hospital, a field team) understands it and knows how far to trust it. This module is about turning results into clear and honest statements."
   },
   {
-    "objectID": "course/05-deliverable.html#presentation",
-    "href": "course/05-deliverable.html#presentation",
-    "title": "Deliverable and assessment",
-    "section": "Presentation",
-    "text": "Presentation\nFive minutes per pair, then questions."
+    "objectID": "course/04-evidence.html#principles",
+    "href": "course/04-evidence.html#principles",
+    "title": "Communicating genomic evidence",
+    "section": "Principles",
+    "text": "Principles\n\nStart with the question the decision maker asks, and answer it first.\nCombine genomic and epidemiological evidence (dates, places, contacts). Genomes alone rarely prove transmission.\nSay how sure you are, and why.\nShow the limits: sampling bias, low resolution, missing data, excluded genomes.\nMake it reproducible: tool versions, parameters, files."
   },
   {
-    "objectID": "course/05-deliverable.html#grid",
-    "href": "course/05-deliverable.html#grid",
-    "title": "Deliverable and assessment",
-    "section": "Grid",
-    "text": "Grid\n\n\n\nCriterion\nPoints\n\n\n\n\nData quality handled correctly (exclusions justified)\n2\n\n\nCorrect lineages and relationships\n3\n\n\nFigure clear and honest\n2\n\n\nWording matches evidence, limits stated\n2\n\n\nUseful, concrete recommendations\n1"
+    "objectID": "course/04-evidence.html#language-of-certainty",
+    "href": "course/04-evidence.html#language-of-certainty",
+    "title": "Communicating genomic evidence",
+    "section": "Language of certainty",
+    "text": "Language of certainty\n\n\n\n\n\n\n\nEvidence\nWording\n\n\n\n\nIdentical or nearly identical genomes, compatible dates and places\n“genomic data are consistent with a common source”\n\n\nSame lineage, no finer resolution\n“we cannot distinguish between local transmission and repeated introductions”\n\n\nDifferent lineages\n“not consistent with a single chain of transmission”\n\n\nLow coverage / many N\n“insufficient data to conclude”\n\n\n\nAvoid: “proves”, “confirms”, “patient X infected patient Y”."
   },
   {
-    "objectID": "course/04-brief-template.html",
-    "href": "course/04-brief-template.html",
-    "title": "One-page brief template",
+    "objectID": "course/04-evidence.html#a-good-figure",
+    "href": "course/04-evidence.html#a-good-figure",
+    "title": "Communicating genomic evidence",
+    "section": "A good figure",
+    "text": "A good figure\n\none message per figure, and the title states the message (not just “Phylogenetic tree”);\ncolour = a variable the reader cares about (region, lineage), with a legend;\nlabel the sample(s) of interest; the caption gives the number of genomes and the method;\nreadable in grayscale and for colour-blind readers."
+  },
+  {
+    "objectID": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
+    "href": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
+    "title": "Communicating genomic evidence",
+    "section": "Exercise 1 — Rewrite these statements (20 min)",
+    "text": "Exercise 1 — Rewrite these statements (20 min)\nRewrite each sentence so that the data support it.\n\n“The Region C genomes prove the outbreak came from Region A.”\n“S03 is negative for the virus.”\n“The tree shows that S01 infected OB10.”\n\n\n\n\n\n\n\nTipSuggested answers\n\n\n\n\n\n\n“The Region C genomes belong to lineages that descend from the lineage first seen in Region A, which is consistent with an introduction from Region A followed by local transmission. Genomic data alone cannot establish the direction; travel and contact data are needed.” (Why: a tree shows relatedness, not direction; “prove” is too strong.)\n“S03 gave insufficient data (mean depth 5x, 95 % of the genome undetermined, in a run whose negative control had viral reads). The result is inconclusive, not negative: the sample should be re-sequenced.” (Why: a failed sequencing is not a negative test.)\n“S01 and OB10 are closely related (2 SNPs apart) and both belong to the early Region A cluster. This is compatible with a close epidemiological link, but the genomes alone do not show who infected whom.” (Why: no direction; other chains can produce the same pattern.)"
+  },
+  {
+    "objectID": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
+    "href": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
+    "title": "Communicating genomic evidence",
+    "section": "Exercise 2 — Write a key message (15 min)",
+    "text": "Exercise 2 — Write a key message (15 min)\nWrite two sentences that answer: “Where does S01 fit in the outbreak, and how sure are you?”\n\n\n\n\n\n\nTipExample\n\n\n\n\n\n“S01 (Region A, 2 March) belongs to lineage TV.2, the early lineage of the outbreak, and is 2 SNPs from three other early Region A genomes, which is consistent with it being part of the same cluster. The genome is complete (99.4 % covered at ≥ 10x), but with only a few SNPs of difference, the resolution does not allow us to identify direct transmission links.”\n\n\n\nNext: One-page brief template."
+  },
+  {
+    "objectID": "course/03-read-tree.html",
+    "href": "course/03-read-tree.html",
+    "title": "Read a phylogenetic tree",
     "section": "",
-    "text": "Use this structure for the Day 5 brief. One page, plain language."
-  },
-  {
-    "objectID": "course/04-brief-template.html#checklist-before-you-share",
-    "href": "course/04-brief-template.html#checklist-before-you-share",
-    "title": "One-page brief template",
-    "section": "Checklist before you share",
-    "text": "Checklist before you share\n\nKey message first\nNumbers consistent between text, table and figure\nExcluded genomes and the reason are listed\nThe negative control is mentioned\nCertainty words match the evidence\nNo patient-identifying information"
-  },
-  {
-    "objectID": "course/03-build-tree.html",
-    "href": "course/03-build-tree.html",
-    "title": "Build a phylogenetic tree",
-    "section": "",
-    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
+    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Build a phylogenetic tree"
+      "Read a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-build-tree.html#choosing-a-method",
-    "href": "course/03-build-tree.html#choosing-a-method",
-    "title": "Build a phylogenetic tree",
+    "objectID": "course/03-read-tree.html#anatomy-of-a-tree",
+    "href": "course/03-read-tree.html#anatomy-of-a-tree",
+    "title": "Read a phylogenetic tree",
     "section": "",
-    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
+    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Build a phylogenetic tree"
+      "Read a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
-    "href": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
-    "title": "Build a phylogenetic tree",
-    "section": "Step 1 — Build the maximum-likelihood tree",
-    "text": "Step 1 — Build the maximum-likelihood tree\nFind the exact name of the root genome in the alignment, then run IQ-TREE:\nOUT=$(grep '&gt;' results/phylo/aln.fasta | grep 'NC_045512.2' | tr -d '&gt;')\necho $OUT\niqtree -s results/phylo/aln.fasta -m MFP -B 1000 -T 2  --prefix results/phylo/tree\nWhat the options mean: -s alignment, -m MFP choose the best model automatically, -B 1000 1,000 ultrafast bootstrap replicates, -T 2 two threads, --seed 1 reproducible result, -o root on the outgroup, --prefix name of the output files.\n(If the model test is too slow on your laptop, use -m GTR+G for a first look.)\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ntree.treefile\nthe tree (Newick format, with bootstrap support)\n\n\ntree.iqtree\nthe full report (model chosen, log-likelihood, tree in text)\n\n\ntree.log\nwhat happened during the run\n\n\n\ngrep \"Best-fit model\" results/phylo/tree.iqtree\nQuestions: which model was chosen? Did IQ-TREE warn about identical sequences?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own report. IQ-TREE may warn that some sequences are identical (or nearly so): this is normal, they end up at the same position in the tree. The exact model matters little here; what matters more is the quality of the alignment.",
+    "objectID": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
+    "href": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
+    "title": "Read a phylogenetic tree",
+    "section": "What a tree can and cannot tell",
+    "text": "What a tree can and cannot tell\n\n\n\n\n\n\n\nIt can show\nIt cannot prove\n\n\n\n\nwhich genomes are closely related\nwho infected whom\n\n\nwhether cases form one cluster or several introductions\nthe direction of transmission\n\n\nwhether a lineage spreads across regions\nthat two similar genomes are epidemiologically linked",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Build a phylogenetic tree"
+      "Read a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
-    "href": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
-    "title": "Build a phylogenetic tree",
-    "section": "Step 2 — Draw and annotate the tree in iTOL",
-    "text": "Step 2 — Draw and annotate the tree in iTOL\n\nOpen https://itol.embl.de and click Upload; upload results/phylo/tree.treefile. (Create an account if you want to keep the tree.)\nIn the control panel, choose the Rectangular display.\nRoot: click on the branch of NC_045512.2 and choose Tree structure → Re-root the tree here.\nSupport: display the bootstrap values (Basic tab, or Advanced tab depending on the version).\nColors: click on an internal node and choose Colors/Styles to colour a clade; colour each lineage (the lineage is in the leaf name) and give your sample, SRR26396743, a different colour.\nExport the picture (PNG, SVG or PDF) from the Export tab.\n\nQuestions: do the lineages form clean groups on the tree? Where is your sample?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree. References of the same lineage should form a group (a clade); sister lineages sit next to each other. Your sample should fall next to the lineage found in the Lineage assignment page. If it sits alone on a long branch, check its percentage of N and its reference set.\n\n\n\nNext: Read a phylogenetic tree.",
+    "objectID": "course/03-read-tree.html#exercise-read-your-tree",
+    "href": "course/03-read-tree.html#exercise-read-your-tree",
+    "title": "Read a phylogenetic tree",
+    "section": "Exercise — read your tree",
+    "text": "Exercise — read your tree\nOpen your tree in iTOL (results/phylo/tree.treefile), rooted on NC_045512.2 and coloured by lineage as in the previous page. The collection dates and countries of the references are in the table of NCBI Virus (you can add these columns with Customize columns).\nQuestions\n\nWhere is your sample, SRR26396743? Who are its closest relatives?\nDo the references of each lineage form a clade? Is there a lineage that does not?\nWhich part of the tree is the oldest? Check it against the collection dates.\nWhich are the longest branches? What do they mean?\nAre the bootstrap values high around your sample? What does it tell you?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree.\n\nYour sample sits in the clade of the closest reference found in Lineage assignment. If it is next to a reference of a given lineage, that lineage is a good candidate.\nReferences of the same lineage normally group together. A lineage that is split suggests a labelling issue, or too few genomes to resolve it.\nThe oldest genomes (early 2020) are close to the root; the tree order should match the collection dates.\nLong branches mean many substitutions between a genome and its relatives: either a lineage that evolved fast (for example the first Omicron lineages) or a sequence with errors or missing data.\nA bootstrap of 95 or more means that the grouping is well supported. Low values around the sample mean that its position is uncertain: the genome may be incomplete, or the closest references are too similar to be separated.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Build a phylogenetic tree"
+      "Read a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/02-lineage.html",
-    "href": "course/02-lineage.html",
-    "title": "Lineage assignment",
-    "section": "",
-    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
-    "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Lineage assignment"
-    ]
-  },
-  {
-    "objectID": "course/02-lineage.html#what-is-a-lineage",
-    "href": "course/02-lineage.html#what-is-a-lineage",
-    "title": "Lineage assignment",
-    "section": "",
-    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
-    "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Lineage assignment"
-    ]
-  },
-  {
-    "objectID": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
-    "href": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
-    "title": "Lineage assignment",
-    "section": "Step 1 — Find the closest labelled reference",
-    "text": "Step 1 — Find the closest labelled reference\nThe simplest way to give a lineage to a new genome is to ask which labelled genome it resembles most. We reuse the SNP distances:\nsnp-dists -m results/phylo/aln.fasta | awk '$1==\"SRR26396743\" && $2!=\"SRR26396743\"' | sort -k3,3n | column -t\nQuestions\n\nWhich reference is the closest to your sample, and what is its lineage?\nIs the closest reference much closer than the others, or are several references at a similar distance?\nCan you already give a lineage to your sample?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own table. If one reference is clearly closer than all the others, your sample probably belongs to that lineage or to a sub-lineage of it. If several references from different lineages are at similar distances, the real lineage is probably not in your reference set and you need more references. The answer is a proposal, not a final call: it must be confirmed with the tree (next module).",
-    "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Lineage assignment"
-    ]
-  },
-  {
-    "objectID": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
-    "href": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
-    "title": "Lineage assignment",
-    "section": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)",
-    "text": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)\nPangolin and Nextclade do this with a complete nomenclature of thousands of lineages and give quality flags (missing data, unexpected mutations). Nothing to install: open https://clades.nextstrain.org, drop results/consensus/SRR26396743.fa in the page and read the clade and Pango lineage it proposes.\nQuestion: does it agree with the lineage of the closest reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe tool may give a more precise lineage (a sub-lineage of the reference that you downloaded), because it knows many more lineages than our 10–15 references. A sub-lineage of the lineage found in Step 1 is a consistent result; a different family means you should re-check the consensus and the references.",
-    "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Lineage assignment"
-    ]
-  },
-  {
-    "objectID": "course/02-lineage.html#final-question",
-    "href": "course/02-lineage.html#final-question",
-    "title": "Lineage assignment",
+    "objectID": "course/03-read-tree.html#final-question",
+    "href": "course/03-read-tree.html#final-question",
+    "title": "Read a phylogenetic tree",
     "section": "Final question",
-    "text": "Final question\nCan two genomes of the same lineage still be unrelated cases? Why?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nYes. A lineage is defined by a few mutations, and many separate chains of transmission can carry the same lineage (for example if it was imported several times, or circulated widely before being sampled). A lineage says “belongs to this family”; to say “linked case” you need finer resolution (extra SNPs, as in the SNP distances) and epidemiological information (dates, places, contacts).\n\n\n\nNext: Build a phylogenetic tree.",
+    "text": "Final question\nTwo genomes are identical. List three explanations other than “A infected B”.\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\n\nToo few mutations to tell them apart: viruses change slowly, so unrelated cases can have the same sequence over a short period.\nA common source that infected both without contact between them.\nA common ancestor several steps earlier, with unsampled intermediate cases (you only see part of the chain).\nLaboratory contamination or barcode bleed between the two samples.\nMissing data: identical on the positions that could be compared (N regions hide differences).\n\n\n\n\nNext: Communicating genomic evidence — module 4.",
+    "crumbs": [
+      "Build and read a phylogenetic tree",
+      "Read a phylogenetic tree"
+    ]
+  },
+  {
+    "objectID": "course/02-reference-selection.html",
+    "href": "course/02-reference-selection.html",
+    "title": "Reference selection",
+    "section": "",
+    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
     "crumbs": [
       "Alignment, lineage & reference selection",
-      "Lineage assignment"
+      "Reference selection"
     ]
   },
   {
-    "objectID": "course/01-concepts.html",
-    "href": "course/01-concepts.html",
-    "title": "Sequencing, file formats and assembly strategies",
+    "objectID": "course/02-reference-selection.html#why-it-matters",
+    "href": "course/02-reference-selection.html#why-it-matters",
+    "title": "Reference selection",
     "section": "",
-    "text": "Both start with the same raw material (FASTQ files) and the same first steps (quality control, trimming, contamination check). They differ in how the genome is rebuilt:\n\nDe novo assembly: reads are stitched together without any reference (new or very divergent virus, bacteria).\nMapping (reference-based): reads are aligned to a known genome, then a consensus is called (known virus: SARS-CoV-2, Rift Valley fever, dengue…).\n\n\n\n\n\n\n\n\nflowchart TD\n  A[\"FASTQ (R1 + R2)\"] --&gt; B[\"1. Quality Control &lt;br/&gt; FastQC &lt;br/&gt;quality of the raw reads\"]\n  B --&gt; C[\"2. Trimming&lt;br/&gt;trimmomatic&lt;br/&gt;remove adapters and low-quality bases\"]\n  C --&gt; D[\"3. Assmbly&lt;br/&gt;SPAdes&lt;br/&gt;assemble the reads into contigs or scaffolds\"]\n  D --&gt; E[\"4. Identification&lt;br/&gt;Kraken2 or BLAST &lt;br/&gt;which organisms are in the reads? contamination?\"]\n  E --&gt; F[\"5. Assembly quality&lt;br/&gt;QUAST&lt;br/&gt; N50, length, genome fraction\"]\n  classDef qc fill:#dbeafe,stroke:#2b6cb0,color:#16395f;\n  class B,C,D,E qc;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1\nFastQC\nper-base quality, adapters, GC content, duplication\nhtml\n\n\n2\ntrimmomatic\ntrims adapters and low-quality ends, drops short reads\nfastq.gz\n\n\n3\nFastQC + MultiQC\nsame check after trimming; MultiQC merges all samples in one page\nhtml\n\n\n4\nKraken2 +BLAST\nassigns each read to a taxon (virus, human, bacteria…); needs a database\ntxt\n\n\n5\nSPAdes\nbuilds contigs ( --meta for metagenomes)\nfasta\n\n\n6\nQUAST\nassembly statistics, comparison to a reference if you give one\nhtml\n\n\n\nOptional additions: seqkit stats (quick read counts), Prokka / Bakta (gene annotation for bacteria), KrakenTools (keep only the reads of the target virus before assembling).\n\n\n\n\n\n\n\n\n\nImportantSteps you do NOT repeat\n\n\n\nIf you already ran pipeline 1 on the same samples, steps 1 to 3 are already done (FastQC, trimmomatic, MultiQC, Kraken2). Reuse the trimmed reads in results/trimmed/. Only the steps in white below are new.\n\n\n\n\n\n\n\nflowchart TD\n  A[\"Trimmed reads (already done in pipeline 1:&lt;br/&gt;FastQC, trimmomatic, MultiQC)\"] --&gt; B[\"4. Mapping&lt;br/&gt;bwa&lt;br/&gt;align the reads to the reference\"]\n  B --&gt; C[\"5. Sorting&lt;br/&gt;samtools&lt;br/&gt;sorted BAM and mapping statistics\"]\n  C --&gt; D[\"6. Variant calling&lt;br/&gt;freebayes - bcftools &lt;br/&gt;list the variants (VCF)\"]\n  D --&gt; E[\"7. Generate consensus&lt;br/&gt;samtools + ivar &lt;br/&gt;build the genome, mask low depth with N\"]\n  E --&gt; F[\"8. Genome QC&lt;br/&gt;% N, mean depth, negative control\"]\n  F --&gt; G[\"9. Lineage (Pangolin, Nextclade),&lt;br/&gt;MAFFT alignment, IQ-TREE\"]\n  classDef done fill:#e2e8f0,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;\n  class A done;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1–4\nFastQC, trimmomatic, MultiQC, Kraken2\nalready done (see pipeline 1)\nfastq.gz\n\n\n5\nbwa (or minimap2)\naligns each read to the reference\nSAM\n\n\n6\nsamtools\nsorts, indexes and counts mapped reads\nbam, .bai\n\n\n7\nsamtools flagstat / depth / coverage\nhow many reads cover each position\ntxt\n\n\n8\nivar consensus\nmajority base at each position; N where depth is too low\nFASTA\n\n\n9\nfreebayes / bcftools\ncalls SNPs and small indels\nVCF\n\n\n10\nawk / seqkit / summary table\ndecide if the genome is good enough\ncsv\n\n\n11\nPangolin or Nextclade, MAFFT, IQ-TREE\nlineage and phylogeny (modules 2–3)\ntree",
+    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
     "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
+      "Alignment, lineage & reference selection",
+      "Reference selection"
     ]
   },
   {
-    "objectID": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
-    "href": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "",
-    "text": "Both start with the same raw material (FASTQ files) and the same first steps (quality control, trimming, contamination check). They differ in how the genome is rebuilt:\n\nDe novo assembly: reads are stitched together without any reference (new or very divergent virus, bacteria).\nMapping (reference-based): reads are aligned to a known genome, then a consensus is called (known virus: SARS-CoV-2, Rift Valley fever, dengue…).\n\n\n\n\n\n\n\n\nflowchart TD\n  A[\"FASTQ (R1 + R2)\"] --&gt; B[\"1. Quality Control &lt;br/&gt; FastQC &lt;br/&gt;quality of the raw reads\"]\n  B --&gt; C[\"2. Trimming&lt;br/&gt;trimmomatic&lt;br/&gt;remove adapters and low-quality bases\"]\n  C --&gt; D[\"3. Assmbly&lt;br/&gt;SPAdes&lt;br/&gt;assemble the reads into contigs or scaffolds\"]\n  D --&gt; E[\"4. Identification&lt;br/&gt;Kraken2 or BLAST &lt;br/&gt;which organisms are in the reads? contamination?\"]\n  E --&gt; F[\"5. Assembly quality&lt;br/&gt;QUAST&lt;br/&gt; N50, length, genome fraction\"]\n  classDef qc fill:#dbeafe,stroke:#2b6cb0,color:#16395f;\n  class B,C,D,E qc;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1\nFastQC\nper-base quality, adapters, GC content, duplication\nhtml\n\n\n2\ntrimmomatic\ntrims adapters and low-quality ends, drops short reads\nfastq.gz\n\n\n3\nFastQC + MultiQC\nsame check after trimming; MultiQC merges all samples in one page\nhtml\n\n\n4\nKraken2 +BLAST\nassigns each read to a taxon (virus, human, bacteria…); needs a database\ntxt\n\n\n5\nSPAdes\nbuilds contigs ( --meta for metagenomes)\nfasta\n\n\n6\nQUAST\nassembly statistics, comparison to a reference if you give one\nhtml\n\n\n\nOptional additions: seqkit stats (quick read counts), Prokka / Bakta (gene annotation for bacteria), KrakenTools (keep only the reads of the target virus before assembling).\n\n\n\n\n\n\n\n\n\nImportantSteps you do NOT repeat\n\n\n\nIf you already ran pipeline 1 on the same samples, steps 1 to 3 are already done (FastQC, trimmomatic, MultiQC, Kraken2). Reuse the trimmed reads in results/trimmed/. Only the steps in white below are new.\n\n\n\n\n\n\n\nflowchart TD\n  A[\"Trimmed reads (already done in pipeline 1:&lt;br/&gt;FastQC, trimmomatic, MultiQC)\"] --&gt; B[\"4. Mapping&lt;br/&gt;bwa&lt;br/&gt;align the reads to the reference\"]\n  B --&gt; C[\"5. Sorting&lt;br/&gt;samtools&lt;br/&gt;sorted BAM and mapping statistics\"]\n  C --&gt; D[\"6. Variant calling&lt;br/&gt;freebayes - bcftools &lt;br/&gt;list the variants (VCF)\"]\n  D --&gt; E[\"7. Generate consensus&lt;br/&gt;samtools + ivar &lt;br/&gt;build the genome, mask low depth with N\"]\n  E --&gt; F[\"8. Genome QC&lt;br/&gt;% N, mean depth, negative control\"]\n  F --&gt; G[\"9. Lineage (Pangolin, Nextclade),&lt;br/&gt;MAFFT alignment, IQ-TREE\"]\n  classDef done fill:#e2e8f0,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;\n  class A done;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1–4\nFastQC, trimmomatic, MultiQC, Kraken2\nalready done (see pipeline 1)\nfastq.gz\n\n\n5\nbwa (or minimap2)\naligns each read to the reference\nSAM\n\n\n6\nsamtools\nsorts, indexes and counts mapped reads\nbam, .bai\n\n\n7\nsamtools flagstat / depth / coverage\nhow many reads cover each position\ntxt\n\n\n8\nivar consensus\nmajority base at each position; N where depth is too low\nFASTA\n\n\n9\nfreebayes / bcftools\ncalls SNPs and small indels\nVCF\n\n\n10\nawk / seqkit / summary table\ndecide if the genome is good enough\ncsv\n\n\n11\nPangolin or Nextclade, MAFFT, IQ-TREE\nlineage and phylogeny (modules 2–3)\ntree",
+    "objectID": "course/02-reference-selection.html#our-sample",
+    "href": "course/02-reference-selection.html#our-sample",
+    "title": "Reference selection",
+    "section": "Our sample",
+    "text": "Our sample\nOur sample is the consensus genome built in the previous exercises from the run SRR26396743:\nls results/consensus/\nseqkit stats results/consensus/SRR26396743.fa\nSince the mapping exercise we have used NC_045512.2 (Wuhan-Hu-1), the RefSeq reference of SARS-CoV-2, as the coordinate system for this sample.\nQuestions: what is the length of the consensus? Why was Wuhan-Hu-1 a good reference to map these reads?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe length should be close to 29.9 kb, that of the SARS-CoV-2 genome. Wuhan-Hu-1 is the RefSeq reference of the right virus, a complete and well-documented genome, and the coordinate system used by the whole community (variant calling, lineage tools, primer schemes).",
     "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
+      "Alignment, lineage & reference selection",
+      "Reference selection"
     ]
   },
   {
-    "objectID": "course/01-concepts.html#sequencing-technologies",
-    "href": "course/01-concepts.html#sequencing-technologies",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "Sequencing technologies",
-    "text": "Sequencing technologies\n\n\n\n\n\n\n\n\n\nIllumina (short reads)\nOxford Nanopore (long reads)\n\n\n\n\nRead length\ntypically 50–300 bp\nfrom hundreds of bp to tens of kb\n\n\nAccuracy\nvery high per base\nlower per read, improving with chemistry and basecalling\n\n\nOutput\npaired-end reads (R1 + R2)\nsingle long reads, available in real time\n\n\nStrengths\naccurate SNPs, high throughput\nstructural variation, repeats, portable devices, fast turnaround\n\n\nTypical weakness\nrepeats and structural variants\nerrors in homopolymers, need for polishing",
+    "objectID": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
+    "href": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
+    "title": "Reference selection",
+    "section": "Step 1 — Download references of several lineages from NCBI Virus",
+    "text": "Step 1 — Download references of several lineages from NCBI Virus\nTo place our genome in a tree (next sessions), we need reference genomes of several lineages from the same database. Open NCBI Virus: https://www.ncbi.nlm.nih.gov/labs/virus and choose SARS-CoV-2 (taxid 2697049).\n\nIn the filters on the left, keep Nucleotide completeness: complete and Host: Homo sapiens.\nFilter by Pango lineage (or add the lineage column to the table with Customize columns) and choose one or two genomes per lineage.\nChoose lineages that span the pandemic: the ancestral lineage B (Wuhan-Hu-1, accession NC_045512.2), Alpha (B.1.1.7), Delta (B.1.617.2), Omicron (BA.1, BA.2, BA.5, XBB.1.5) and the lineages circulating when your sample was collected (look at the collection_date of the run SRR26396743 on its NCBI BioSample page).\nPrefer genomes with a full date and country, and with few ambiguous bases.\nSelect about 10–15 genomes, then Download → Nucleotide → FASTA → Build custom, and put Accession and Pango lineage in the definition line. Save the file as data/ncbi/lineage_refs.fasta.\n\nClean the names (no spaces, no |: the tree software does not like them):\nsed '/^&gt;/ { s/[ |][ |]*/_/g; s/_$// }' data/ncbi/lineage_refs.fasta &gt; data/ncbi/lineage_refs.clean.fasta\ngrep '&gt;' data/ncbi/lineage_refs.clean.fasta\nEach name should now look like ACCESSION_LINEAGE. Check that NC_045512.2 is in the list: it will be our root.\nQuestions: how many genomes did you keep? Which criteria did you use to choose them?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe criteria are the table at the top of the page: same species, complete genome, few N, documented (accession, lineage, date, country), and a good spread of lineages and dates so that the tree has meaningful comparisons. One genome per lineage is enough for this exercise; real studies use many more.",
     "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
+      "Alignment, lineage & reference selection",
+      "Reference selection"
     ]
   },
   {
-    "objectID": "course/01-concepts.html#library-preparation-approaches-viruses",
-    "href": "course/01-concepts.html#library-preparation-approaches-viruses",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "Library preparation approaches (viruses)",
-    "text": "Library preparation approaches (viruses)\n\n\n\n\n\n\n\n\n\nWGS / metagenomics\nAmplicon (e.g. ARTIC)\n\n\n\n\nPrinciple\nsequence everything in the sample\namplify the virus in overlapping tiles (multiplex PCR)\n\n\nBest when\nyou do not know what you are looking for\nroutine viral surveillance (the most common approach)\n\n\nWatch out for\nmost reads may not come from the virus\namplicon dropout when primer sites mutate",
+    "objectID": "course/02-reference-selection.html#final-question",
+    "href": "course/02-reference-selection.html#final-question",
+    "title": "Reference selection",
+    "section": "Final question",
+    "text": "Final question\nWhy should all the samples of a study be mapped to the same reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nBecause differences are measured against the reference, with its coordinates. If each sample used another reference, positions would not correspond, mutations would not be comparable, and differences between references would be mistaken for differences between samples. One common reference = one common coordinate system = genomes you can align and compare.\n\n\n\nNext: Alignment.",
     "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
-    ]
-  },
-  {
-    "objectID": "course/01-concepts.html#file-formats",
-    "href": "course/01-concepts.html#file-formats",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "File formats",
-    "text": "File formats\n\n\n\n\n\n\n\n\nFormat\nContent\nCompanion\n\n\n\n\nFASTA\nsequences (reference, consensus)\n.fai index\n\n\nFASTQ\nreads + base qualities (4 lines per read)\n–\n\n\nSAM / BAM / CRAM\nalignments (text / binary / compressed)\n.bai index (BAM must be sorted)\n\n\nVCF\nvariants\n.tbi index when bgzipped\n\n\nBED\nintervals (e.g. low-depth regions)\n–\n\n\ndepth table\ndepth per position\n–\n\n\n\n\nA FASTQ record\n@read_name\nACGTACGT...            sequence\n+\nIIIIHHHHGGGG...        quality, one character per base\nPhred score Q = −10·log10(P error): Q20 → 1 error in 100, Q30 → 1 in 1,000. The character encodes Q + 33.",
-    "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
-    ]
-  },
-  {
-    "objectID": "course/01-concepts.html#mapping-or-de-novo-assembly",
-    "href": "course/01-concepts.html#mapping-or-de-novo-assembly",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "Mapping or de novo assembly?",
-    "text": "Mapping or de novo assembly?\n\n\n\n\n\n\n\n\n\n\nMapping to a reference\nDe novo assembly\nHybrid\n\n\n\n\nPrinciple\nalign reads to a known genome\nrebuild the genome without reference\ncombine short and long reads\n\n\nTools\nbwa, minimap2, iVar, bcftools\nSPAdes, MEGAHIT; Flye, Canu\nUnicycler\n\n\nChoose when\nknown, little-divergent virus; amplicon data\nnew/divergent pathogen, bacteria, rearrangements\nboth read types available\n\n\n\nThree questions to decide: Do I have a good reference? Are my reads long? Is my coverage sufficient?",
-    "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
-    ]
-  },
-  {
-    "objectID": "course/01-concepts.html#pitfalls-to-remember",
-    "href": "course/01-concepts.html#pitfalls-to-remember",
-    "title": "Sequencing, file formats and assembly strategies",
-    "section": "Pitfalls to remember",
-    "text": "Pitfalls to remember\n\nCross-contamination and barcode bleed between samples (always read the negative control).\nWrong reference or unsuitable lineage.\n\nNext: FASTQ and quality control.",
-    "crumbs": [
-      "FASTQ → consensus genome",
-      "Sequencing, file formats and assembly strategies"
-    ]
-  },
-  {
-    "objectID": "index.html",
-    "href": "index.html",
-    "title": "From FASTQ to Outbreak Insights",
-    "section": "",
-    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
-    "crumbs": [
-      "Home"
-    ]
-  },
-  {
-    "objectID": "index.html#the-learning-path",
-    "href": "index.html#the-learning-path",
-    "title": "From FASTQ to Outbreak Insights",
-    "section": "",
-    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
-    "crumbs": [
-      "Home"
-    ]
-  },
-  {
-    "objectID": "index.html#how-to-work",
-    "href": "index.html#how-to-work",
-    "title": "From FASTQ to Outbreak Insights",
-    "section": "How to work",
-    "text": "How to work\n\nDo the setup once.\nFollow the pages in the order of the left menu; each exercise ends with a question to discuss.\nFill in your answer sheet and, on Day 5, your one-page brief.",
-    "crumbs": [
-      "Home"
+      "Alignment, lineage & reference selection",
+      "Reference selection"
     ]
   },
   {
@@ -562,226 +508,389 @@
     ]
   },
   {
-    "objectID": "course/02-reference-selection.html",
-    "href": "course/02-reference-selection.html",
-    "title": "Reference selection",
+    "objectID": "index.html",
+    "href": "index.html",
+    "title": "From FASTQ to Outbreak Insights",
     "section": "",
-    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
+    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
     "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Reference selection"
+      "Home"
     ]
   },
   {
-    "objectID": "course/02-reference-selection.html#why-it-matters",
-    "href": "course/02-reference-selection.html#why-it-matters",
-    "title": "Reference selection",
+    "objectID": "index.html#the-learning-path",
+    "href": "index.html#the-learning-path",
+    "title": "From FASTQ to Outbreak Insights",
     "section": "",
-    "text": "Reads are mapped to one reference, and the consensus is built from that mapping. A reference that is too divergent makes reads map badly (or not at all), hides real variants and biases the consensus towards the reference. For a tree, we also need reference genomes of several lineages to place our own genome in context.\n\n\n\n\n\n\n\nCriterion\nQuestion\n\n\n\n\nSame species / lineage\nis it the right virus, the right lineage?\n\n\nClose to your samples\nfewer differences = better mapping\n\n\nComplete and good quality\ncomplete genome, few ambiguous bases (N)\n\n\nWell documented\naccession number, host, country, collection date\n\n\nConsistent across the study\nthe same reference for all the samples you compare",
+    "text": "#\nModule\nYou will learn to…\n\n\n\n\n1\nFASTQ → consensus genome\nread FASTQ files, do QC, map reads, inspect coverage, build a consensus and decide if it is usable\n\n\n2\nAlignment, lineage & reference selection\nchoose a reference, align genomes, assign a lineage\n\n\n3\nBuild and read a phylogenetic tree\ninfer a tree, root it, read clades, support and branch lengths\n\n\n\nModule 1 is the 3-hour bridge session (talk + dry lab); modules 2–3 are Day 4 (phylogenetics) and modules 4–5 are Day 5 (capstone).",
     "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Reference selection"
+      "Home"
     ]
   },
   {
-    "objectID": "course/02-reference-selection.html#our-sample",
-    "href": "course/02-reference-selection.html#our-sample",
-    "title": "Reference selection",
-    "section": "Our sample",
-    "text": "Our sample\nOur sample is the consensus genome built in the previous exercises from the run SRR26396743:\nls results/consensus/\nseqkit stats results/consensus/SRR26396743.fa\nSince the mapping exercise we have used NC_045512.2 (Wuhan-Hu-1), the RefSeq reference of SARS-CoV-2, as the coordinate system for this sample.\nQuestions: what is the length of the consensus? Why was Wuhan-Hu-1 a good reference to map these reads?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe length should be close to 29.9 kb, that of the SARS-CoV-2 genome. Wuhan-Hu-1 is the RefSeq reference of the right virus, a complete and well-documented genome, and the coordinate system used by the whole community (variant calling, lineage tools, primer schemes).",
+    "objectID": "index.html#how-to-work",
+    "href": "index.html#how-to-work",
+    "title": "From FASTQ to Outbreak Insights",
+    "section": "How to work",
+    "text": "How to work\n\nDo the setup once.\nFollow the pages in the order of the left menu; each exercise ends with a question to discuss.\nFill in your answer sheet and, on Day 5, your one-page brief.",
     "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Reference selection"
+      "Home"
     ]
   },
   {
-    "objectID": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
-    "href": "course/02-reference-selection.html#step-1-download-references-of-several-lineages-from-ncbi-virus",
-    "title": "Reference selection",
-    "section": "Step 1 — Download references of several lineages from NCBI Virus",
-    "text": "Step 1 — Download references of several lineages from NCBI Virus\nTo place our genome in a tree (next sessions), we need reference genomes of several lineages from the same database. Open NCBI Virus: https://www.ncbi.nlm.nih.gov/labs/virus and choose SARS-CoV-2 (taxid 2697049).\n\nIn the filters on the left, keep Nucleotide completeness: complete and Host: Homo sapiens.\nFilter by Pango lineage (or add the lineage column to the table with Customize columns) and choose one or two genomes per lineage.\nChoose lineages that span the pandemic: the ancestral lineage B (Wuhan-Hu-1, accession NC_045512.2), Alpha (B.1.1.7), Delta (B.1.617.2), Omicron (BA.1, BA.2, BA.5, XBB.1.5) and the lineages circulating when your sample was collected (look at the collection_date of the run SRR26396743 on its NCBI BioSample page).\nPrefer genomes with a full date and country, and with few ambiguous bases.\nSelect about 10–15 genomes, then Download → Nucleotide → FASTA → Build custom, and put Accession and Pango lineage in the definition line. Save the file as data/ncbi/lineage_refs.fasta.\n\nClean the names (no spaces, no |: the tree software does not like them):\nsed '/^&gt;/ { s/[ |][ |]*/_/g; s/_$// }' data/ncbi/lineage_refs.fasta &gt; data/ncbi/lineage_refs.clean.fasta\ngrep '&gt;' data/ncbi/lineage_refs.clean.fasta\nEach name should now look like ACCESSION_LINEAGE. Check that NC_045512.2 is in the list: it will be our root.\nQuestions: how many genomes did you keep? Which criteria did you use to choose them?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe criteria are the table at the top of the page: same species, complete genome, few N, documented (accession, lineage, date, country), and a good spread of lineages and dates so that the tree has meaningful comparisons. One genome per lineage is enough for this exercise; real studies use many more.",
+    "objectID": "course/01-concepts.html",
+    "href": "course/01-concepts.html",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "",
+    "text": "All the tools in this course (FastQC, bwa, samtools…) are run from the terminal, not by clicking. This section gives you the minimum you need. Type the examples yourself: you learn by doing.\n\n\n\n\n\n\nNoteWhich terminal?\n\n\n\n\nLinux / macOS: open the Terminal application.\nWindows: use WSL (Windows Subsystem for Linux) or Git Bash. Your Windows disk C: is then at /mnt/c/.\n\n\n\n\n\nls -l -h /home/awa/data\n\n\n\n\n\n\n\n\nPart\nName\nRole\n\n\n\n\nls\ncommand\nthe program to run\n\n\n-l, -h\noptions (flags)\nchange the behaviour; can be combined: -lh\n\n\n/home/awa/data\nargument\nwhat the command works on (file, folder…)\n\n\n\n\nThe prompt (e.g. awa@pc:~$) means the terminal is waiting for you. Do not type the $.\nLinux is case-sensitive: Sample.fastq and sample.fastq are two different files.\nLines starting with # are comments, ignored by the shell.\nTab auto-completes names (use it all the time, it avoids typos). ↑ brings back the previous command. Ctrl+C stops a running command.\n\n\n\n\nA path is the address of a file or folder. Everything depends on understanding paths.\n/                          ← root of the whole system\n├── home/\n│   └── awa/               ← home directory of user \"awa\" (shortcut: ~)\n│       └── project/\n│           ├── data/\n│           │   ├── sample1_R1.fastq.gz\n│           │   └── sample1_R2.fastq.gz\n│           ├── ref/\n│           │   └── reference.fasta\n│           └── results/\n│               └── trimmed/\n\n\n\n\n\n\n\n\nSymbol\nMeaning\nExample\n\n\n\n\n/\nroot of the system (and the separator between folders)\n/home/awa\n\n\n~\nyour home directory\n~/project = /home/awa/project\n\n\n.\nthe current directory\n./script.sh\n\n\n..\nthe parent directory (one level up)\ncd ..\n\n\n-\nthe previous directory (with cd)\ncd -\n\n\n\nAbsolute path: starts with / (or ~). It works from anywhere.\nls /home/awa/project/data\nRelative path: does not start with /. It starts from where you are now (the current directory).\n# I am in /home/awa/project\nls data                  # = /home/awa/project/data\nls ref/reference.fasta   # = /home/awa/project/ref/reference.fasta\n\n# I am in /home/awa/project/results/trimmed\nls ../..                 # = /home/awa/project   (two levels up)\nls ../../data            # = /home/awa/project/data\n\n\n\n\n\n\nTipRule of thumb\n\n\n\n\n“No such file or directory” is almost always a path problem: run pwd and ls to check where you are.\nInside scripts and pipelines, prefer relative paths from the project root so the project can be moved to another computer.\nAvoid spaces and accents in file names: use sample_1.fastq, not my sample 1.fastq. If a name contains spaces, put it in quotes: ls \"my folder\".\n\n\n\n\n\n\npwd (print working directory): where am I?\npwd\n# /home/awa\nls: list the content of a folder.\nls                 # current folder\nls data            # a given folder\nls -l              # long format: permissions, owner, size, date\nls -lh             # sizes readable (K, M, G)\nls -a              # also show hidden files (names starting with .)\nls -lht            # sorted by time, newest first\nls data/*.fastq.gz # only the matching files (see wildcards below)\ncd (change directory): go to another folder.\ncd project             # relative: go into \"project\"\ncd /home/awa/project   # absolute: works from anywhere\ncd ..                  # one level up\ncd ../..               # two levels up\ncd ~                   # home (same as just: cd)\ncd -                   # back to the previous folder\n\n\n\nmkdir: create a folder.\nmkdir project\nmkdir -p project/results/trimmed   # -p creates all missing parent folders\nmkdir -p project/{data,ref,results,logs}   # several folders at once\ntouch: create an empty file (or update its date).\ntouch notes.txt\nnano: a simple text editor in the terminal.\nnano notes.txt      # type your text, Ctrl+O then Enter = save, Ctrl+X = quit\n\n\n\ncp (copy):\ncp ref/reference.fasta ref/backup.fasta     # copy a file\ncp data/*.fastq.gz /home/awa/backup/        # copy many files into a folder\ncp -r data data_copy                        # -r = recursive, needed for folders\nmv (move and rename):\nmv notes.txt docs/              # move into the folder docs\nmv notes.txt notes_v2.txt       # rename\nmv sample1.fq data/sample1.fq   # move + keep the name\nrm (remove):\nrm notes.txt          # delete a file\nrm -i notes.txt       # ask for confirmation first (safer)\nrm -r old_folder      # delete a folder and everything inside\nrmdir empty_folder    # delete a folder only if it is empty\n\n\n\n\n\n\nWarningThere is no recycle bin\n\n\n\nrm is permanent. Never run rm -rf on a path you have not checked with ls first. Be especially careful with *: rm *.fastq deletes all your reads, so test with ls *.fastq first.\n\n\n\n\n\ncat notes.txt                  # print the whole file (small files only!)\nhead sample.fastq              # first 10 lines\nhead -n 4 sample.fastq         # first 4 lines = one FASTQ read\ntail -n 20 logfile.txt         # last 20 lines\ntail -f logfile.txt            # follow a file as it grows (Ctrl+C to stop)\nless reference.fasta           # scroll: space = next page, q = quit, /word = search\nwc -l notes.txt                # count lines (-w words, -c bytes)\nfile sample.fastq.gz           # what type of file is it?\n\n\n\n\n\n\nTip\n\n\n\nNever cat a FASTQ or BAM file: it can contain millions of lines. Use head or less.\n\n\n\n\n\n\n\n\n\n\n\n\n\nPattern\nMatches\nExample\n\n\n\n\n*\nany number of characters\nls *.fastq.gz\n\n\n?\nexactly one character\nls sample?_R1.fastq.gz (sample1, sample2…)\n\n\n[12]\none of the listed characters\nls sample[12]_R1.fastq.gz\n\n\n{a,b}\nlist of alternatives\nls sample1_R{1,2}.fastq.gz\n\n\n\nls data/*_R1.fastq.gz      # all forward reads\nls data/sample1_R{1,2}.fastq.gz\n\n\n\ngrep: find lines containing a pattern.\ngrep \"&gt;\" reference.fasta            # lines with \"&gt;\" = sequence names\ngrep -c \"&gt;\" reference.fasta         # count them\ngrep -i \"error\" logfile.txt         # ignore upper/lower case\ngrep -v \"#\" variants.vcf            # lines that do NOT contain \"#\" (remove VCF header)\ngrep -n \"ERROR\" logfile.txt         # show line numbers\ncut, sort, uniq: work on columns and tables.\ncut -f1 table.tsv                   # first column of a tab-separated file\ncut -d\",\" -f1,3 table.csv           # columns 1 and 3 of a CSV (-d = separator)\nsort names.txt                      # alphabetical order\nsort -n numbers.txt                 # numeric order\nsort names.txt | uniq               # remove duplicates (input must be sorted)\nsort names.txt | uniq -c            # count each distinct value\n\n\n\nThe pipe | sends the output of one command to the next. &gt; writes the output to a file (replaces it), &gt;&gt; appends to a file.\nls data | wc -l                         # how many files in data?\ngrep -v \"#\" variants.vcf | wc -l        # how many variants?\nls data &gt; file_list.txt                 # save the list in a file\necho \"run 1 done\" &gt;&gt; logfile.txt        # add a line at the end\ncommand 2&gt; errors.txt                   # save error messages only\ncommand &gt; out.txt 2&gt;&1                  # save output + errors together\n\n\n\nSequencing files are usually compressed (.gz) to save space.\ngzip notes.txt                  # compress -&gt; notes.txt.gz\ngunzip notes.txt.gz             # decompress\nzcat sample.fastq.gz | head -n 8        # read a .gz without decompressing\nzcat sample_R1.fastq.gz | wc -l         # number of lines...\necho $(( $(zcat sample_R1.fastq.gz | wc -l) / 4 ))   # ...divided by 4 = number of reads\n\ntar -czvf archive.tar.gz folder/   # create an archive (c=create, z=gzip, v=verbose, f=file)\ntar -xzvf archive.tar.gz           # extract it (x=extract)\n\n\n\nfind . -name \"*.fastq.gz\"           # search from the current folder\nfind /home/awa/project -name \"*.bam\" -size +1G   # BAM files bigger than 1 GB\ndu -sh data                         # total size of a folder\ndu -sh data/*                       # size of each item inside\ndf -h                               # free space on the disks\n\n\n\nfastqc --help          # most bioinformatics tools explain themselves\nman ls                 # manual of a Linux command (q to quit)\nwhich samtools         # where is this program installed? (nothing = not installed)\nhistory | tail         # your last commands\n\n\n\nls -l shows permissions such as -rwxr-xr-- (read, write, execute for owner, group, others).\nchmod +x run_pipeline.sh      # make a script executable\n./run_pipeline.sh             # run it (./ = \"in the current folder\")\nbash run_pipeline.sh          # or run it with bash, no chmod needed\n\n\n\n# Variables: no spaces around =, use $ to read the value\nSAMPLE=sample1\necho $SAMPLE\necho \"data/${SAMPLE}_R1.fastq.gz\"\n\n# Loop: do the same thing for each file\nfor f in data/*_R1.fastq.gz\ndo\n  echo \"Counting reads in $f\"\n  echo $(( $(zcat $f | wc -l) / 4 ))\ndone\n\n\n\nwget https://example.org/reference.fasta      # download a file\ncurl -O https://example.org/reference.fasta   # same with curl\n\n\n\n\n\n\nI want to…\nCommand\n\n\n\n\nknow where I am\npwd\n\n\nlist files\nls -lh\n\n\ngo to a folder\ncd path\n\n\ngo up one level\ncd ..\n\n\ncreate folders\nmkdir -p a/b/c\n\n\ncopy / move / delete\ncp, mv, rm\n\n\nread the start / end of a file\nhead, tail\n\n\nread a compressed file\nzcat file.gz \\| head\n\n\ncount lines\nwc -l\n\n\nsearch text\ngrep\n\n\nchain commands\n\\|\n\n\nsave output to a file\n&gt; or &gt;&gt;\n\n\nget help\ntool --help, man tool\n\n\n\n\n\n\n\nNo such file or directory: wrong path or typo. Check with pwd, ls, and Tab completion.\nPermission denied: the file is not executable (chmod +x) or you do not own the folder.\ncommand not found: the program is not installed or not in your PATH (check with which).\nSpaces in names: they split the name into two arguments. Rename the file or use quotes.\nOverwriting by accident: &gt; and mv/cp replace existing files without asking. Use cp -i, mv -i.\nWorking in the wrong folder: start each session with pwd.\n\n\n\n\nDo this in order and check each result with ls:\ncd ~\nmkdir -p course/{data,ref,results/trimmed,logs}\ncd course\ntouch data/sample1_R1.fastq data/sample1_R2.fastq\nls -R                                   # show the whole tree\ncp data/sample1_R1.fastq results/trimmed/\nmv results/trimmed/sample1_R1.fastq results/trimmed/sample1_R1_trimmed.fastq\ncd results/trimmed\npwd                                     # where am I?\ncd ../../data                           # relative path: two up, then data\nls &gt; ../logs/files.txt\ncat ../logs/files.txt\nTo go further, do Exercise 0: command line basics.",
     "crumbs": [
-      "Alignment, lineage & reference selection",
-      "Reference selection"
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
     ]
   },
   {
-    "objectID": "course/02-reference-selection.html#final-question",
-    "href": "course/02-reference-selection.html#final-question",
-    "title": "Reference selection",
+    "objectID": "course/01-concepts.html#command-line-basics-for-beginners",
+    "href": "course/01-concepts.html#command-line-basics-for-beginners",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "",
+    "text": "All the tools in this course (FastQC, bwa, samtools…) are run from the terminal, not by clicking. This section gives you the minimum you need. Type the examples yourself: you learn by doing.\n\n\n\n\n\n\nNoteWhich terminal?\n\n\n\n\nLinux / macOS: open the Terminal application.\nWindows: use WSL (Windows Subsystem for Linux) or Git Bash. Your Windows disk C: is then at /mnt/c/.\n\n\n\n\n\nls -l -h /home/awa/data\n\n\n\n\n\n\n\n\nPart\nName\nRole\n\n\n\n\nls\ncommand\nthe program to run\n\n\n-l, -h\noptions (flags)\nchange the behaviour; can be combined: -lh\n\n\n/home/awa/data\nargument\nwhat the command works on (file, folder…)\n\n\n\n\nThe prompt (e.g. awa@pc:~$) means the terminal is waiting for you. Do not type the $.\nLinux is case-sensitive: Sample.fastq and sample.fastq are two different files.\nLines starting with # are comments, ignored by the shell.\nTab auto-completes names (use it all the time, it avoids typos). ↑ brings back the previous command. Ctrl+C stops a running command.\n\n\n\n\nA path is the address of a file or folder. Everything depends on understanding paths.\n/                          ← root of the whole system\n├── home/\n│   └── awa/               ← home directory of user \"awa\" (shortcut: ~)\n│       └── project/\n│           ├── data/\n│           │   ├── sample1_R1.fastq.gz\n│           │   └── sample1_R2.fastq.gz\n│           ├── ref/\n│           │   └── reference.fasta\n│           └── results/\n│               └── trimmed/\n\n\n\n\n\n\n\n\nSymbol\nMeaning\nExample\n\n\n\n\n/\nroot of the system (and the separator between folders)\n/home/awa\n\n\n~\nyour home directory\n~/project = /home/awa/project\n\n\n.\nthe current directory\n./script.sh\n\n\n..\nthe parent directory (one level up)\ncd ..\n\n\n-\nthe previous directory (with cd)\ncd -\n\n\n\nAbsolute path: starts with / (or ~). It works from anywhere.\nls /home/awa/project/data\nRelative path: does not start with /. It starts from where you are now (the current directory).\n# I am in /home/awa/project\nls data                  # = /home/awa/project/data\nls ref/reference.fasta   # = /home/awa/project/ref/reference.fasta\n\n# I am in /home/awa/project/results/trimmed\nls ../..                 # = /home/awa/project   (two levels up)\nls ../../data            # = /home/awa/project/data\n\n\n\n\n\n\nTipRule of thumb\n\n\n\n\n“No such file or directory” is almost always a path problem: run pwd and ls to check where you are.\nInside scripts and pipelines, prefer relative paths from the project root so the project can be moved to another computer.\nAvoid spaces and accents in file names: use sample_1.fastq, not my sample 1.fastq. If a name contains spaces, put it in quotes: ls \"my folder\".\n\n\n\n\n\n\npwd (print working directory): where am I?\npwd\n# /home/awa\nls: list the content of a folder.\nls                 # current folder\nls data            # a given folder\nls -l              # long format: permissions, owner, size, date\nls -lh             # sizes readable (K, M, G)\nls -a              # also show hidden files (names starting with .)\nls -lht            # sorted by time, newest first\nls data/*.fastq.gz # only the matching files (see wildcards below)\ncd (change directory): go to another folder.\ncd project             # relative: go into \"project\"\ncd /home/awa/project   # absolute: works from anywhere\ncd ..                  # one level up\ncd ../..               # two levels up\ncd ~                   # home (same as just: cd)\ncd -                   # back to the previous folder\n\n\n\nmkdir: create a folder.\nmkdir project\nmkdir -p project/results/trimmed   # -p creates all missing parent folders\nmkdir -p project/{data,ref,results,logs}   # several folders at once\ntouch: create an empty file (or update its date).\ntouch notes.txt\nnano: a simple text editor in the terminal.\nnano notes.txt      # type your text, Ctrl+O then Enter = save, Ctrl+X = quit\n\n\n\ncp (copy):\ncp ref/reference.fasta ref/backup.fasta     # copy a file\ncp data/*.fastq.gz /home/awa/backup/        # copy many files into a folder\ncp -r data data_copy                        # -r = recursive, needed for folders\nmv (move and rename):\nmv notes.txt docs/              # move into the folder docs\nmv notes.txt notes_v2.txt       # rename\nmv sample1.fq data/sample1.fq   # move + keep the name\nrm (remove):\nrm notes.txt          # delete a file\nrm -i notes.txt       # ask for confirmation first (safer)\nrm -r old_folder      # delete a folder and everything inside\nrmdir empty_folder    # delete a folder only if it is empty\n\n\n\n\n\n\nWarningThere is no recycle bin\n\n\n\nrm is permanent. Never run rm -rf on a path you have not checked with ls first. Be especially careful with *: rm *.fastq deletes all your reads, so test with ls *.fastq first.\n\n\n\n\n\ncat notes.txt                  # print the whole file (small files only!)\nhead sample.fastq              # first 10 lines\nhead -n 4 sample.fastq         # first 4 lines = one FASTQ read\ntail -n 20 logfile.txt         # last 20 lines\ntail -f logfile.txt            # follow a file as it grows (Ctrl+C to stop)\nless reference.fasta           # scroll: space = next page, q = quit, /word = search\nwc -l notes.txt                # count lines (-w words, -c bytes)\nfile sample.fastq.gz           # what type of file is it?\n\n\n\n\n\n\nTip\n\n\n\nNever cat a FASTQ or BAM file: it can contain millions of lines. Use head or less.\n\n\n\n\n\n\n\n\n\n\n\n\n\nPattern\nMatches\nExample\n\n\n\n\n*\nany number of characters\nls *.fastq.gz\n\n\n?\nexactly one character\nls sample?_R1.fastq.gz (sample1, sample2…)\n\n\n[12]\none of the listed characters\nls sample[12]_R1.fastq.gz\n\n\n{a,b}\nlist of alternatives\nls sample1_R{1,2}.fastq.gz\n\n\n\nls data/*_R1.fastq.gz      # all forward reads\nls data/sample1_R{1,2}.fastq.gz\n\n\n\ngrep: find lines containing a pattern.\ngrep \"&gt;\" reference.fasta            # lines with \"&gt;\" = sequence names\ngrep -c \"&gt;\" reference.fasta         # count them\ngrep -i \"error\" logfile.txt         # ignore upper/lower case\ngrep -v \"#\" variants.vcf            # lines that do NOT contain \"#\" (remove VCF header)\ngrep -n \"ERROR\" logfile.txt         # show line numbers\ncut, sort, uniq: work on columns and tables.\ncut -f1 table.tsv                   # first column of a tab-separated file\ncut -d\",\" -f1,3 table.csv           # columns 1 and 3 of a CSV (-d = separator)\nsort names.txt                      # alphabetical order\nsort -n numbers.txt                 # numeric order\nsort names.txt | uniq               # remove duplicates (input must be sorted)\nsort names.txt | uniq -c            # count each distinct value\n\n\n\nThe pipe | sends the output of one command to the next. &gt; writes the output to a file (replaces it), &gt;&gt; appends to a file.\nls data | wc -l                         # how many files in data?\ngrep -v \"#\" variants.vcf | wc -l        # how many variants?\nls data &gt; file_list.txt                 # save the list in a file\necho \"run 1 done\" &gt;&gt; logfile.txt        # add a line at the end\ncommand 2&gt; errors.txt                   # save error messages only\ncommand &gt; out.txt 2&gt;&1                  # save output + errors together\n\n\n\nSequencing files are usually compressed (.gz) to save space.\ngzip notes.txt                  # compress -&gt; notes.txt.gz\ngunzip notes.txt.gz             # decompress\nzcat sample.fastq.gz | head -n 8        # read a .gz without decompressing\nzcat sample_R1.fastq.gz | wc -l         # number of lines...\necho $(( $(zcat sample_R1.fastq.gz | wc -l) / 4 ))   # ...divided by 4 = number of reads\n\ntar -czvf archive.tar.gz folder/   # create an archive (c=create, z=gzip, v=verbose, f=file)\ntar -xzvf archive.tar.gz           # extract it (x=extract)\n\n\n\nfind . -name \"*.fastq.gz\"           # search from the current folder\nfind /home/awa/project -name \"*.bam\" -size +1G   # BAM files bigger than 1 GB\ndu -sh data                         # total size of a folder\ndu -sh data/*                       # size of each item inside\ndf -h                               # free space on the disks\n\n\n\nfastqc --help          # most bioinformatics tools explain themselves\nman ls                 # manual of a Linux command (q to quit)\nwhich samtools         # where is this program installed? (nothing = not installed)\nhistory | tail         # your last commands\n\n\n\nls -l shows permissions such as -rwxr-xr-- (read, write, execute for owner, group, others).\nchmod +x run_pipeline.sh      # make a script executable\n./run_pipeline.sh             # run it (./ = \"in the current folder\")\nbash run_pipeline.sh          # or run it with bash, no chmod needed\n\n\n\n# Variables: no spaces around =, use $ to read the value\nSAMPLE=sample1\necho $SAMPLE\necho \"data/${SAMPLE}_R1.fastq.gz\"\n\n# Loop: do the same thing for each file\nfor f in data/*_R1.fastq.gz\ndo\n  echo \"Counting reads in $f\"\n  echo $(( $(zcat $f | wc -l) / 4 ))\ndone\n\n\n\nwget https://example.org/reference.fasta      # download a file\ncurl -O https://example.org/reference.fasta   # same with curl\n\n\n\n\n\n\nI want to…\nCommand\n\n\n\n\nknow where I am\npwd\n\n\nlist files\nls -lh\n\n\ngo to a folder\ncd path\n\n\ngo up one level\ncd ..\n\n\ncreate folders\nmkdir -p a/b/c\n\n\ncopy / move / delete\ncp, mv, rm\n\n\nread the start / end of a file\nhead, tail\n\n\nread a compressed file\nzcat file.gz \\| head\n\n\ncount lines\nwc -l\n\n\nsearch text\ngrep\n\n\nchain commands\n\\|\n\n\nsave output to a file\n&gt; or &gt;&gt;\n\n\nget help\ntool --help, man tool\n\n\n\n\n\n\n\nNo such file or directory: wrong path or typo. Check with pwd, ls, and Tab completion.\nPermission denied: the file is not executable (chmod +x) or you do not own the folder.\ncommand not found: the program is not installed or not in your PATH (check with which).\nSpaces in names: they split the name into two arguments. Rename the file or use quotes.\nOverwriting by accident: &gt; and mv/cp replace existing files without asking. Use cp -i, mv -i.\nWorking in the wrong folder: start each session with pwd.\n\n\n\n\nDo this in order and check each result with ls:\ncd ~\nmkdir -p course/{data,ref,results/trimmed,logs}\ncd course\ntouch data/sample1_R1.fastq data/sample1_R2.fastq\nls -R                                   # show the whole tree\ncp data/sample1_R1.fastq results/trimmed/\nmv results/trimmed/sample1_R1.fastq results/trimmed/sample1_R1_trimmed.fastq\ncd results/trimmed\npwd                                     # where am I?\ncd ../../data                           # relative path: two up, then data\nls &gt; ../logs/files.txt\ncat ../logs/files.txt\nTo go further, do Exercise 0: command line basics.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
+    "href": "course/01-concepts.html#two-ways-to-build-a-genome-from-illumina-reads",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "Two ways to build a genome from Illumina reads",
+    "text": "Two ways to build a genome from Illumina reads\nBoth start with the same raw material (FASTQ files) and the same first steps (quality control, trimming, contamination check). They differ in how the genome is rebuilt:\n\nDe novo assembly: reads are stitched together without any reference (new or very divergent virus, bacteria).\nMapping (reference-based): reads are aligned to a known genome, then a consensus is called (known virus: SARS-CoV-2, Rift Valley fever, dengue…).\n\n\nPipeline 1 — de novo assembly (Illumina)\n\n\n\n\n\nflowchart TD\n  A[\"FASTQ (R1 + R2)\"] --&gt; B[\"1. Quality Control &lt;br/&gt; FastQC &lt;br/&gt;quality of the raw reads\"]\n  B --&gt; C[\"2. Trimming&lt;br/&gt;trimmomatic&lt;br/&gt;remove adapters and low-quality bases\"]\n  C --&gt; D[\"3. Assmbly&lt;br/&gt;SPAdes&lt;br/&gt;assemble the reads into contigs or scaffolds\"]\n  D --&gt; E[\"4. Identification&lt;br/&gt;Kraken2 or BLAST &lt;br/&gt;which organisms are in the reads? contamination?\"]\n  E --&gt; F[\"5. Assembly quality&lt;br/&gt;QUAST&lt;br/&gt; N50, length, genome fraction\"]\n  classDef qc fill:#dbeafe,stroke:#2b6cb0,color:#16395f;\n  class B,C,D,E qc;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1\nFastQC\nper-base quality, adapters, GC content, duplication\nhtml\n\n\n2\ntrimmomatic\ntrims adapters and low-quality ends, drops short reads\nfastq.gz\n\n\n3\nFastQC + MultiQC\nsame check after trimming; MultiQC merges all samples in one page\nhtml\n\n\n4\nKraken2 +BLAST\nassigns each read to a taxon (virus, human, bacteria…); needs a database\ntxt\n\n\n5\nSPAdes\nbuilds contigs ( --meta for metagenomes)\nfasta\n\n\n6\nQUAST\nassembly statistics, comparison to a reference if you give one\nhtml\n\n\n\nOptional additions: seqkit stats (quick read counts), Prokka / Bakta (gene annotation for bacteria), KrakenTools (keep only the reads of the target virus before assembling).\n\n\nPipeline 2 — mapping to a reference (Illumina)\n\n\n\n\n\n\nImportantSteps you do NOT repeat\n\n\n\nIf you already ran pipeline 1 on the same samples, steps 1 to 3 are already done (FastQC, trimmomatic, MultiQC, Kraken2). Reuse the trimmed reads in results/trimmed/. Only the steps in white below are new.\n\n\n\n\n\n\n\nflowchart TD\n  A[\"Trimmed reads (already done in pipeline 1:&lt;br/&gt;FastQC, trimmomatic, MultiQC)\"] --&gt; B[\"4. Mapping&lt;br/&gt;bwa&lt;br/&gt;align the reads to the reference\"]\n  B --&gt; C[\"5. Sorting&lt;br/&gt;samtools&lt;br/&gt;sorted BAM and mapping statistics\"]\n  C --&gt; D[\"6. Variant calling&lt;br/&gt;freebayes - bcftools &lt;br/&gt;list the variants (VCF)\"]\n  D --&gt; E[\"7. Generate consensus&lt;br/&gt;samtools + ivar &lt;br/&gt;build the genome, mask low depth with N\"]\n  E --&gt; F[\"8. Genome QC&lt;br/&gt;% N, mean depth, negative control\"]\n  F --&gt; G[\"9. Lineage (Pangolin, Nextclade),&lt;br/&gt;MAFFT alignment, IQ-TREE\"]\n  classDef done fill:#e2e8f0,stroke:#94a3b8,color:#64748b,stroke-dasharray: 4 3;\n  class A done;\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStep\nTool\nWhat it does\nMain output\n\n\n\n\n1–4\nFastQC, trimmomatic, MultiQC, Kraken2\nalready done (see pipeline 1)\nfastq.gz\n\n\n5\nbwa (or minimap2)\naligns each read to the reference\nSAM\n\n\n6\nsamtools\nsorts, indexes and counts mapped reads\nbam, .bai\n\n\n7\nsamtools flagstat / depth / coverage\nhow many reads cover each position\ntxt\n\n\n8\nivar consensus\nmajority base at each position; N where depth is too low\nFASTA\n\n\n9\nfreebayes / bcftools\ncalls SNPs and small indels\nVCF\n\n\n10\nawk / seqkit / summary table\ndecide if the genome is good enough\ncsv\n\n\n11\nPangolin or Nextclade, MAFFT, IQ-TREE\nlineage and phylogeny (modules 2–3)\ntree",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#sequencing-technologies",
+    "href": "course/01-concepts.html#sequencing-technologies",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "Sequencing technologies",
+    "text": "Sequencing technologies\n\n\n\n\n\n\n\n\n\nIllumina (short reads)\nOxford Nanopore (long reads)\n\n\n\n\nRead length\ntypically 50–300 bp\nfrom hundreds of bp to tens of kb\n\n\nAccuracy\nvery high per base\nlower per read, improving with chemistry and basecalling\n\n\nOutput\npaired-end reads (R1 + R2)\nsingle long reads, available in real time\n\n\nStrengths\naccurate SNPs, high throughput\nstructural variation, repeats, portable devices, fast turnaround\n\n\nTypical weakness\nrepeats and structural variants\nerrors in homopolymers, need for polishing",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#library-preparation-approaches-viruses",
+    "href": "course/01-concepts.html#library-preparation-approaches-viruses",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "Library preparation approaches (viruses)",
+    "text": "Library preparation approaches (viruses)\n\n\n\n\n\n\n\n\n\nWGS / metagenomics\nAmplicon (e.g. ARTIC)\n\n\n\n\nPrinciple\nsequence everything in the sample\namplify the virus in overlapping tiles (multiplex PCR)\n\n\nBest when\nyou do not know what you are looking for\nroutine viral surveillance (the most common approach)\n\n\nWatch out for\nmost reads may not come from the virus\namplicon dropout when primer sites mutate",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#file-formats",
+    "href": "course/01-concepts.html#file-formats",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "File formats",
+    "text": "File formats\n\n\n\n\n\n\n\n\nFormat\nContent\nCompanion\n\n\n\n\nFASTA\nsequences (reference, consensus)\n.fai index\n\n\nFASTQ\nreads + base qualities (4 lines per read)\n–\n\n\nSAM / BAM / CRAM\nalignments (text / binary / compressed)\n.bai index (BAM must be sorted)\n\n\nVCF\nvariants\n.tbi index when bgzipped\n\n\nBED\nintervals (e.g. low-depth regions)\n–\n\n\ndepth table\ndepth per position\n–\n\n\n\n\nA FASTQ record\n@read_name\nACGTACGT...            sequence\n+\nIIIIHHHHGGGG...        quality, one character per base\nPhred score Q = −10·log10(P error): Q20 → 1 error in 100, Q30 → 1 in 1,000. The character encodes Q + 33.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#mapping-or-de-novo-assembly",
+    "href": "course/01-concepts.html#mapping-or-de-novo-assembly",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "Mapping or de novo assembly?",
+    "text": "Mapping or de novo assembly?\n\n\n\n\n\n\n\n\n\n\nMapping to a reference\nDe novo assembly\nHybrid\n\n\n\n\nPrinciple\nalign reads to a known genome\nrebuild the genome without reference\ncombine short and long reads\n\n\nTools\nbwa, minimap2, iVar, bcftools\nSPAdes, MEGAHIT; Flye, Canu\nUnicycler\n\n\nChoose when\nknown, little-divergent virus; amplicon data\nnew/divergent pathogen, bacteria, rearrangements\nboth read types available\n\n\n\nThree questions to decide: Do I have a good reference? Are my reads long? Is my coverage sufficient?",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/01-concepts.html#pitfalls-to-remember",
+    "href": "course/01-concepts.html#pitfalls-to-remember",
+    "title": "Command line basic, Sequencing file formats and assembly strategies",
+    "section": "Pitfalls to remember",
+    "text": "Pitfalls to remember\n\nCross-contamination and barcode bleed between samples (always read the negative control).\nWrong reference or unsuitable lineage.\n\nNext: FASTQ and quality control.",
+    "crumbs": [
+      "FASTQ → consensus genome",
+      "Command line basic, Sequencing file formats and assembly strategies"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html",
+    "href": "course/02-lineage.html",
+    "title": "Lineage assignment",
+    "section": "",
+    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#what-is-a-lineage",
+    "href": "course/02-lineage.html#what-is-a-lineage",
+    "title": "Lineage assignment",
+    "section": "",
+    "text": "A lineage is a named group of genomes sharing a common ancestor, defined by mutations specific to that group. For SARS-CoV-2 the standard nomenclature is Pango; names are hierarchical (BA.2 descends from the Omicron lineages, B.1.1.7 is Alpha), so lineages give a common language to talk about genomes without exchanging full sequences.\nThe references you downloaded from NCBI Virus already carry their Pango lineage in their name (ACCESSION_LINEAGE): they are our labelled landmarks.\ngrep '&gt;' results/phylo/aln.fasta",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
+    "href": "course/02-lineage.html#step-1-find-the-closest-labelled-reference",
+    "title": "Lineage assignment",
+    "section": "Step 1 — Find the closest labelled reference",
+    "text": "Step 1 — Find the closest labelled reference\nThe simplest way to give a lineage to a new genome is to ask which labelled genome it resembles most. We reuse the SNP distances:\nsnp-dists -m results/phylo/aln.fasta | awk '$1==\"SRR26396743\" && $2!=\"SRR26396743\"' | sort -k3,3n | column -t\nQuestions\n\nWhich reference is the closest to your sample, and what is its lineage?\nIs the closest reference much closer than the others, or are several references at a similar distance?\nCan you already give a lineage to your sample?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own table. If one reference is clearly closer than all the others, your sample probably belongs to that lineage or to a sub-lineage of it. If several references from different lineages are at similar distances, the real lineage is probably not in your reference set and you need more references. The answer is a proposal, not a final call: it must be confirmed with the tree (next module).",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
+    "href": "course/02-lineage.html#step-2-cross-check-with-a-dedicated-tool-optional-in-the-browser",
+    "title": "Lineage assignment",
+    "section": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)",
+    "text": "Step 2 — Cross-check with a dedicated tool (optional, in the browser)\nPangolin and Nextclade do this with a complete nomenclature of thousands of lineages and give quality flags (missing data, unexpected mutations). Nothing to install: open https://clades.nextstrain.org, drop results/consensus/SRR26396743.fa in the page and read the clade and Pango lineage it proposes.\nQuestion: does it agree with the lineage of the closest reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nThe tool may give a more precise lineage (a sub-lineage of the reference that you downloaded), because it knows many more lineages than our 10–15 references. A sub-lineage of the lineage found in Step 1 is a consistent result; a different family means you should re-check the consensus and the references.",
+    "crumbs": [
+      "Alignment, lineage & reference selection",
+      "Lineage assignment"
+    ]
+  },
+  {
+    "objectID": "course/02-lineage.html#final-question",
+    "href": "course/02-lineage.html#final-question",
+    "title": "Lineage assignment",
     "section": "Final question",
-    "text": "Final question\nWhy should all the samples of a study be mapped to the same reference?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nBecause differences are measured against the reference, with its coordinates. If each sample used another reference, positions would not correspond, mutations would not be comparable, and differences between references would be mistaken for differences between samples. One common reference = one common coordinate system = genomes you can align and compare.\n\n\n\nNext: Alignment.",
+    "text": "Final question\nCan two genomes of the same lineage still be unrelated cases? Why?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nYes. A lineage is defined by a few mutations, and many separate chains of transmission can carry the same lineage (for example if it was imported several times, or circulated widely before being sampled). A lineage says “belongs to this family”; to say “linked case” you need finer resolution (extra SNPs, as in the SNP distances) and epidemiological information (dates, places, contacts).\n\n\n\nNext: Build a phylogenetic tree.",
     "crumbs": [
       "Alignment, lineage & reference selection",
-      "Reference selection"
+      "Lineage assignment"
     ]
   },
   {
-    "objectID": "course/03-read-tree.html",
-    "href": "course/03-read-tree.html",
-    "title": "Read a phylogenetic tree",
+    "objectID": "course/03-build-tree.html",
+    "href": "course/03-build-tree.html",
+    "title": "Build a phylogenetic tree",
     "section": "",
-    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
+    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Read a phylogenetic tree"
+      "Build a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-read-tree.html#anatomy-of-a-tree",
-    "href": "course/03-read-tree.html#anatomy-of-a-tree",
-    "title": "Read a phylogenetic tree",
+    "objectID": "course/03-build-tree.html#choosing-a-method",
+    "href": "course/03-build-tree.html#choosing-a-method",
+    "title": "Build a phylogenetic tree",
     "section": "",
-    "text": "Tips = the genomes you sequenced or downloaded. Internal nodes = inferred common ancestors.\nBranch length = amount of change (substitutions per site), not time (unless the tree is time-scaled).\nClade = an ancestor and all its descendants. Rotating the branches around a node does not change the tree.\nRoot = where the tree starts. Without a root you cannot say who is ancestral.\nSupport (bootstrap) = how robust a branch is. With ultrafast bootstrap, a value ≥ 95 is considered strong; be careful with lower values.",
+    "text": "Method\nIdea\nUse\n\n\n\n\nDistance (neighbour-joining)\ntree built from pairwise distances\nvery fast first look\n\n\nMaximum likelihood (IQ-TREE, RAxML)\nthe tree that makes the alignment most probable under a substitution model\nstandard choice\n\n\nBayesian / time-scaled (BEAST, TreeTime)\nadds time and uncertainty\ndating, advanced analyses\n\n\n\nThree choices to make: the substitution model (IQ-TREE tests several with -m MFP), the support (ultrafast bootstrap, -B 1000) and the root (an outgroup: a genome that branches off before all the others).\nThe outgroup must be related to your genomes but outside of them. For SARS-CoV-2 genomes we use Wuhan-Hu-1 (NC_045512.2), the oldest lineage: the tree then reads from the beginning of the pandemic to the recent lineages.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Read a phylogenetic tree"
+      "Build a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
-    "href": "course/03-read-tree.html#what-a-tree-can-and-cannot-tell",
-    "title": "Read a phylogenetic tree",
-    "section": "What a tree can and cannot tell",
-    "text": "What a tree can and cannot tell\n\n\n\n\n\n\n\nIt can show\nIt cannot prove\n\n\n\n\nwhich genomes are closely related\nwho infected whom\n\n\nwhether cases form one cluster or several introductions\nthe direction of transmission\n\n\nwhether a lineage spreads across regions\nthat two similar genomes are epidemiologically linked",
+    "objectID": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
+    "href": "course/03-build-tree.html#step-1-build-the-maximum-likelihood-tree",
+    "title": "Build a phylogenetic tree",
+    "section": "Step 1 — Build the maximum-likelihood tree",
+    "text": "Step 1 — Build the maximum-likelihood tree\nFind the exact name of the root genome in the alignment, then run IQ-TREE:\nOUT=$(grep '&gt;' results/phylo/aln.fasta | grep 'NC_045512.2' | tr -d '&gt;')\necho $OUT\niqtree -s results/phylo/aln.fasta -m MFP -B 1000 -T 2  --prefix results/phylo/tree\nWhat the options mean: -s alignment, -m MFP choose the best model automatically, -B 1000 1,000 ultrafast bootstrap replicates, -T 2 two threads, --seed 1 reproducible result, -o root on the outgroup, --prefix name of the output files.\n(If the model test is too slow on your laptop, use -m GTR+G for a first look.)\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ntree.treefile\nthe tree (Newick format, with bootstrap support)\n\n\ntree.iqtree\nthe full report (model chosen, log-likelihood, tree in text)\n\n\ntree.log\nwhat happened during the run\n\n\n\ngrep \"Best-fit model\" results/phylo/tree.iqtree\nQuestions: which model was chosen? Did IQ-TREE warn about identical sequences?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own report. IQ-TREE may warn that some sequences are identical (or nearly so): this is normal, they end up at the same position in the tree. The exact model matters little here; what matters more is the quality of the alignment.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Read a phylogenetic tree"
+      "Build a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-read-tree.html#exercise-read-your-tree",
-    "href": "course/03-read-tree.html#exercise-read-your-tree",
-    "title": "Read a phylogenetic tree",
-    "section": "Exercise — read your tree",
-    "text": "Exercise — read your tree\nOpen your tree in iTOL (results/phylo/tree.treefile), rooted on NC_045512.2 and coloured by lineage as in the previous page. The collection dates and countries of the references are in the table of NCBI Virus (you can add these columns with Customize columns).\nQuestions\n\nWhere is your sample, SRR26396743? Who are its closest relatives?\nDo the references of each lineage form a clade? Is there a lineage that does not?\nWhich part of the tree is the oldest? Check it against the collection dates.\nWhich are the longest branches? What do they mean?\nAre the bootstrap values high around your sample? What does it tell you?\n\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree.\n\nYour sample sits in the clade of the closest reference found in Lineage assignment. If it is next to a reference of a given lineage, that lineage is a good candidate.\nReferences of the same lineage normally group together. A lineage that is split suggests a labelling issue, or too few genomes to resolve it.\nThe oldest genomes (early 2020) are close to the root; the tree order should match the collection dates.\nLong branches mean many substitutions between a genome and its relatives: either a lineage that evolved fast (for example the first Omicron lineages) or a sequence with errors or missing data.\nA bootstrap of 95 or more means that the grouping is well supported. Low values around the sample mean that its position is uncertain: the genome may be incomplete, or the closest references are too similar to be separated.",
+    "objectID": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
+    "href": "course/03-build-tree.html#step-2-draw-and-annotate-the-tree-in-itol",
+    "title": "Build a phylogenetic tree",
+    "section": "Step 2 — Draw and annotate the tree in iTOL",
+    "text": "Step 2 — Draw and annotate the tree in iTOL\n\nOpen https://itol.embl.de and click Upload; upload results/phylo/tree.treefile. (Create an account if you want to keep the tree.)\nIn the control panel, choose the Rectangular display.\nRoot: click on the branch of NC_045512.2 and choose Tree structure → Re-root the tree here.\nSupport: display the bootstrap values (Basic tab, or Advanced tab depending on the version).\nColors: click on an internal node and choose Colors/Styles to colour a clade; colour each lineage (the lineage is in the leaf name) and give your sample, SRR26396743, a different colour.\nExport the picture (PNG, SVG or PDF) from the Export tab.\n\nQuestions: do the lineages form clean groups on the tree? Where is your sample?\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\nUse your own tree. References of the same lineage should form a group (a clade); sister lineages sit next to each other. Your sample should fall next to the lineage found in the Lineage assignment page. If it sits alone on a long branch, check its percentage of N and its reference set.\n\n\n\nNext: Read a phylogenetic tree.",
     "crumbs": [
       "Build and read a phylogenetic tree",
-      "Read a phylogenetic tree"
+      "Build a phylogenetic tree"
     ]
   },
   {
-    "objectID": "course/03-read-tree.html#final-question",
-    "href": "course/03-read-tree.html#final-question",
-    "title": "Read a phylogenetic tree",
-    "section": "Final question",
-    "text": "Final question\nTwo genomes are identical. List three explanations other than “A infected B”.\n\n\n\n\n\n\nTipAnswer\n\n\n\n\n\n\nToo few mutations to tell them apart: viruses change slowly, so unrelated cases can have the same sequence over a short period.\nA common source that infected both without contact between them.\nA common ancestor several steps earlier, with unsampled intermediate cases (you only see part of the chain).\nLaboratory contamination or barcode bleed between the two samples.\nMissing data: identical on the positions that could be compared (N regions hide differences).\n\n\n\n\nNext: Communicating genomic evidence — module 4.",
-    "crumbs": [
-      "Build and read a phylogenetic tree",
-      "Read a phylogenetic tree"
-    ]
-  },
-  {
-    "objectID": "course/04-evidence.html",
-    "href": "course/04-evidence.html",
-    "title": "Communicating genomic evidence",
+    "objectID": "course/04-brief-template.html",
+    "href": "course/04-brief-template.html",
+    "title": "One-page brief template",
     "section": "",
-    "text": "A genome analysis is useful only if the person who has to decide (a ministry, a hospital, a field team) understands it and knows how far to trust it. This module is about turning results into clear and honest statements."
+    "text": "Use this structure for the Day 5 brief. One page, plain language."
   },
   {
-    "objectID": "course/04-evidence.html#principles",
-    "href": "course/04-evidence.html#principles",
-    "title": "Communicating genomic evidence",
-    "section": "Principles",
-    "text": "Principles\n\nStart with the question the decision maker asks, and answer it first.\nCombine genomic and epidemiological evidence (dates, places, contacts). Genomes alone rarely prove transmission.\nSay how sure you are, and why.\nShow the limits: sampling bias, low resolution, missing data, excluded genomes.\nMake it reproducible: tool versions, parameters, files."
+    "objectID": "course/04-brief-template.html#checklist-before-you-share",
+    "href": "course/04-brief-template.html#checklist-before-you-share",
+    "title": "One-page brief template",
+    "section": "Checklist before you share",
+    "text": "Checklist before you share\n\nKey message first\nNumbers consistent between text, table and figure\nExcluded genomes and the reason are listed\nThe negative control is mentioned\nCertainty words match the evidence\nNo patient-identifying information"
   },
   {
-    "objectID": "course/04-evidence.html#language-of-certainty",
-    "href": "course/04-evidence.html#language-of-certainty",
-    "title": "Communicating genomic evidence",
-    "section": "Language of certainty",
-    "text": "Language of certainty\n\n\n\n\n\n\n\nEvidence\nWording\n\n\n\n\nIdentical or nearly identical genomes, compatible dates and places\n“genomic data are consistent with a common source”\n\n\nSame lineage, no finer resolution\n“we cannot distinguish between local transmission and repeated introductions”\n\n\nDifferent lineages\n“not consistent with a single chain of transmission”\n\n\nLow coverage / many N\n“insufficient data to conclude”\n\n\n\nAvoid: “proves”, “confirms”, “patient X infected patient Y”."
-  },
-  {
-    "objectID": "course/04-evidence.html#a-good-figure",
-    "href": "course/04-evidence.html#a-good-figure",
-    "title": "Communicating genomic evidence",
-    "section": "A good figure",
-    "text": "A good figure\n\none message per figure, and the title states the message (not just “Phylogenetic tree”);\ncolour = a variable the reader cares about (region, lineage), with a legend;\nlabel the sample(s) of interest; the caption gives the number of genomes and the method;\nreadable in grayscale and for colour-blind readers."
-  },
-  {
-    "objectID": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
-    "href": "course/04-evidence.html#exercise-1-rewrite-these-statements-20-min",
-    "title": "Communicating genomic evidence",
-    "section": "Exercise 1 — Rewrite these statements (20 min)",
-    "text": "Exercise 1 — Rewrite these statements (20 min)\nRewrite each sentence so that the data support it.\n\n“The Region C genomes prove the outbreak came from Region A.”\n“S03 is negative for the virus.”\n“The tree shows that S01 infected OB10.”\n\n\n\n\n\n\n\nTipSuggested answers\n\n\n\n\n\n\n“The Region C genomes belong to lineages that descend from the lineage first seen in Region A, which is consistent with an introduction from Region A followed by local transmission. Genomic data alone cannot establish the direction; travel and contact data are needed.” (Why: a tree shows relatedness, not direction; “prove” is too strong.)\n“S03 gave insufficient data (mean depth 5x, 95 % of the genome undetermined, in a run whose negative control had viral reads). The result is inconclusive, not negative: the sample should be re-sequenced.” (Why: a failed sequencing is not a negative test.)\n“S01 and OB10 are closely related (2 SNPs apart) and both belong to the early Region A cluster. This is compatible with a close epidemiological link, but the genomes alone do not show who infected whom.” (Why: no direction; other chains can produce the same pattern.)"
-  },
-  {
-    "objectID": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
-    "href": "course/04-evidence.html#exercise-2-write-a-key-message-15-min",
-    "title": "Communicating genomic evidence",
-    "section": "Exercise 2 — Write a key message (15 min)",
-    "text": "Exercise 2 — Write a key message (15 min)\nWrite two sentences that answer: “Where does S01 fit in the outbreak, and how sure are you?”\n\n\n\n\n\n\nTipExample\n\n\n\n\n\n“S01 (Region A, 2 March) belongs to lineage TV.2, the early lineage of the outbreak, and is 2 SNPs from three other early Region A genomes, which is consistent with it being part of the same cluster. The genome is complete (99.4 % covered at ≥ 10x), but with only a few SNPs of difference, the resolution does not allow us to identify direct transmission links.”\n\n\n\nNext: One-page brief template."
-  },
-  {
-    "objectID": "course/05-model-answer.html",
-    "href": "course/05-model-answer.html",
-    "title": "Model answer",
+    "objectID": "course/05-deliverable.html",
+    "href": "course/05-deliverable.html",
+    "title": "Deliverable and assessment",
     "section": "",
-    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
+    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
   },
   {
-    "objectID": "course/05-model-answer.html#answers-to-the-three-questions",
-    "href": "course/05-model-answer.html#answers-to-the-three-questions",
-    "title": "Model answer",
+    "objectID": "course/05-deliverable.html#what-to-hand-in",
+    "href": "course/05-deliverable.html#what-to-hand-in",
+    "title": "Deliverable and assessment",
     "section": "",
-    "text": "1. Are the Region C cases linked to the Region A outbreak? Probably yes. The Region C genomes belong to TV.2 and its descendants. TV.2 first appears in Region A (1–5 March, S01 on 2 March), and the first TV.2 case in Region C comes later (OB22, 12 March), only 1 SNP from OB10, an early Region A genome. The large Region C cluster (TV.2.2, 7 genomes from 25 March) descends from that same ancestor and carries 3 own mutations: it is the result of local transmission in Region C after an introduction. A TV.2.1 genome in Region C (OB14, 2 April) is 4 SNPs from a Region A TV.2.1 genome (OB23) but 10 from the local TV.2.2 cluster: a second link between the regions, not part of the local cluster. The tree cannot prove the direction of the introductions; the dates and the early appearance in Region A make “A → C” the most plausible reading.\n2. Are the Region B cases part of the outbreak? No (not on these data). The Region B genomes are TV.3, 6 SNPs from the root and without any of the TV.2 mutations: an older, independent lineage. Region B and D also have TV.1 background genomes.\n3. How confident, and what next? Moderate. Strengths: complete genomes, clear lineage structure, dates that agree with the tree. Limits: very few SNPs (1–3 per branch), small sample (26 genomes), no contact information, one low-quality genome excluded (OB24, 23 % N). Next steps: sequence more Region C cases and the cases between 5 and 25 March; collect travel and contact data of OB22 and OB14; re-sequence the failed samples (S02, S03)."
+    "text": "A one-page brief (PDF or doc) containing:\n\na key message of two sentences;\nthe data and quality section (genomes analysed / excluded, and why);\none figure (tree or timeline) with a self-explanatory caption;\nan interpretation with an explicit confidence level;\nlimits and recommendations."
   },
   {
-    "objectID": "course/05-model-answer.html#example-brief-one-page",
-    "href": "course/05-model-answer.html#example-brief-one-page",
-    "title": "Model answer",
-    "section": "Example brief (one page)",
-    "text": "Example brief (one page)\n\nGenomic investigation brief — TOYV1, Regions A–C\nKey message. The Region C cases are consistent with an introduction from Region A in early March followed by local transmission; the older Region B cases belong to a different lineage and are not part of this chain. Confidence: moderate.\nData and quality. 28 genomes received (27 outbreak + S01), 27 analysed. OB24 excluded (23 % N). Reference TOYV1. Negative control: 50 viral reads (barcode bleed); the samples concerned have &gt; 70x and are not affected.\nFindings. Lineage TV.2 first seen in Region A on 1–5 March. In Region C: one early TV.2 genome (12 March), a cluster of 7 TV.2.2 genomes (25 March–26 April) and one TV.2.1 genome (2 April). Region B: TV.3 (5 genomes) and TV.1, 16 SNPs or more from TV.2.\nFigure. Tree of 27 genomes coloured by region (maximum-likelihood, 1,000 ultrafast bootstraps).\nInterpretation. The pattern suggests an introduction followed by local transmission in Region C; the direction of introductions is inferred from dates, not demonstrated by the genomes.\nLimits. Few SNPs (low resolution), small sample, no contact data.\nRecommendations. Sequence more Region C cases and the March cases; collect travel/contact history for the early Region C and TV.2.1 cases; re-sequence samples with insufficient coverage."
+    "objectID": "course/05-deliverable.html#presentation",
+    "href": "course/05-deliverable.html#presentation",
+    "title": "Deliverable and assessment",
+    "section": "Presentation",
+    "text": "Presentation\nFive minutes per pair, then questions."
   },
   {
-    "objectID": "course/05-workflow.html",
-    "href": "course/05-workflow.html",
-    "title": "Suggested workflow",
+    "objectID": "course/05-deliverable.html#grid",
+    "href": "course/05-deliverable.html#grid",
+    "title": "Deliverable and assessment",
+    "section": "Grid",
+    "text": "Grid\n\n\n\nCriterion\nPoints\n\n\n\n\nData quality handled correctly (exclusions justified)\n2\n\n\nCorrect lineages and relationships\n3\n\n\nFigure clear and honest\n2\n\n\nWording matches evidence, limits stated\n2\n\n\nUseful, concrete recommendations\n1"
+  },
+  {
+    "objectID": "course/05-scenario.html",
+    "href": "course/05-scenario.html",
+    "title": "Scenario and data",
     "section": "",
-    "text": "Follow the steps in order; each command is independent, copy and paste them one at a time. Adapt freely. Every step ends with a checkpoint question."
+    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
   },
   {
-    "objectID": "course/05-workflow.html#quality-filter",
-    "href": "course/05-workflow.html#quality-filter",
-    "title": "Suggested workflow",
-    "section": "1. Quality filter",
-    "text": "1. Quality filter\nHow much of each outbreak genome is missing (N)?\nawk '/^&gt;/{if(name) printf \"%s\\t%.1f%%\\n\", name, 100*n/len; name=substr($0,2); n=0; len=0; next} {n+=gsub(/N/,\"N\"); len+=length($0)} END{printf \"%s\\t%.1f%%\\n\", name, 100*n/len}' data/outbreak/sequences.fasta | sort -k2 -n -r | head -5\nRemove the genomes above 10 % N (here one), and build the dataset with the reference and S01:\nmkdir -p results/outbreak\nsed 's/^&gt;.*/&gt;TOYV1_ref/' data/reference/TOYV1.fasta &gt; results/outbreak/all.fasta\nseqkit grep -v -p OB24 data/outbreak/sequences.fasta &gt;&gt; results/outbreak/all.fasta\ncat results/consensus/S01.fa &gt;&gt; results/outbreak/all.fasta\ngrep -c '&gt;' results/outbreak/all.fasta\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB24 has 23 % N and is the only genome above the threshold: excluded. The dataset has 28 sequences (1 reference + 26 outbreak + S01)."
+    "objectID": "course/05-scenario.html#the-situation",
+    "href": "course/05-scenario.html#the-situation",
+    "title": "Scenario and data",
+    "section": "",
+    "text": "Between January and April 2026 a febrile illness caused by a TOYV1-like virus is reported in several regions. The first cluster of the year in Region A was sequenced in early March (your sample S01). Cases then appear in Region C, while Region B reports older, unrelated cases.\nThe ministry asks you three questions:\n\nAre the Region C cases linked to the Region A outbreak, or are they independent?\nAre the older Region B cases part of the same outbreak?\nHow confident are you, and what should be done next?"
   },
   {
-    "objectID": "course/05-workflow.html#align-and-assign-lineages",
-    "href": "course/05-workflow.html#align-and-assign-lineages",
-    "title": "Suggested workflow",
-    "section": "2. Align and assign lineages",
-    "text": "2. Align and assign lineages\nmafft --auto --preservecase --thread 2 results/outbreak/all.fasta &gt; results/outbreak/aln.fasta\npython3 scripts/13_lineage.py results/outbreak/aln.fasta --out results/outbreak/lineages.tsv\n(Plan B without MAFFT: python3 scripts/11b_align_fallback.py, which uses OB24 too; ignore it or remove it afterwards.)\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nS01 = TV.2. The other genomes fall in TV.1 (3), TV.3 (5), TV.2 (4), TV.2.1 (8), TV.2.2 (6, without OB24)."
+    "objectID": "course/05-scenario.html#data",
+    "href": "course/05-scenario.html#data",
+    "title": "Scenario and data",
+    "section": "Data",
+    "text": "Data\n\n\n\n\n\n\n\nFile\nContent\n\n\n\n\ndata/outbreak/sequences.fasta\n27 consensus genomes (OB01–OB27)\n\n\ndata/outbreak/metadata.tsv\ncollection date and region\n\n\ndata/outbreak/lineage_definitions.tsv\nthe lineage nomenclature\n\n\ndata/reference/TOYV1.fasta\nthe reference\n\n\nyour S01 consensus\nfrom module 1 (precomputed/consensus/S01.fa as plan B)"
   },
   {
-    "objectID": "course/05-workflow.html#tree",
-    "href": "course/05-workflow.html#tree",
-    "title": "Suggested workflow",
-    "section": "3. Tree",
-    "text": "3. Tree\niqtree2 -s results/outbreak/aln.fasta -m MFP -B 1000 -T 2 --seed 1 -o TOYV1_ref --prefix results/outbreak/tree -redo\npython3 scripts/14_plot_tree.py results/outbreak/tree.treefile --lineages results/outbreak/lineages.tsv --color region --out results/outbreak/tree_region.png\n(Plan B: precomputed/phylo/tree.nwk and tree_region.png.)"
+    "objectID": "course/05-scenario.html#rules",
+    "href": "course/05-scenario.html#rules",
+    "title": "Scenario and data",
+    "section": "Rules",
+    "text": "Rules\n\nWork in pairs, 3 hours in total.\nYou may use any script from the course.\nExplain every exclusion.\nThe deliverable is a one-page brief with one figure."
   },
   {
-    "objectID": "course/05-workflow.html#genomics-next-to-epidemiology",
-    "href": "course/05-workflow.html#genomics-next-to-epidemiology",
-    "title": "Suggested workflow",
-    "section": "4. Genomics next to epidemiology",
-    "text": "4. Genomics next to epidemiology\nSort the genomes by date and look at each lineage’s first appearance, place and time:\njoin -t $'\\t' &lt;(sort -k1,1 results/outbreak/lineages.tsv) &lt;(sort -k1,1 data/outbreak/metadata.tsv) | cut -f1,2,4,5 | sort -t$'\\t' -k3,3 | column -t -s $'\\t'\nQuestions: when and where does each lineage first appear? Is any genome out of place (a lineage in an unexpected region)?\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nTV.1 (Jan–Feb, Regions B and D) → TV.3 (Feb–Mar, Region B) → TV.2 first in Region A on 1–5 March → TV.2.1 in Region A (from 20 March) and TV.2.2 in Region C (from 25 March). Out of place: OB22 (TV.2) in Region C on 12 March, and OB14 (TV.2.1) in Region C on 2 April."
+    "objectID": "exercises/00_command_line.html",
+    "href": "exercises/00_command_line.html",
+    "title": "Exercise 0 — Command line basics",
+    "section": "",
+    "text": "Practise the basic Linux commands and, above all, paths, on a small project that looks like the one you will use for the pipelines.\nTime: about 45 minutes. Rules: type every command yourself (no copy-paste for parts A to C), and run pwd whenever you are unsure where you are. Solutions are hidden below each part: try first, then check."
   },
   {
-    "objectID": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
-    "href": "course/05-workflow.html#how-far-apart-are-region-c-and-region-a-genomes",
-    "title": "Suggested workflow",
-    "section": "5. How far apart are Region C and Region A genomes?",
-    "text": "5. How far apart are Region C and Region A genomes?\npython3 scripts/15_snp_matrix.py results/outbreak/aln.fasta --out results/outbreak/snp_matrix.tsv --ids S01,OB10,OB22,OB14,OB08,OB07,OB23,OB03\ncolumn -t results/outbreak/snp_matrix.tsv\n\n\n\n\n\n\nTipCheckpoint\n\n\n\n\n\nOB22 (Region C, TV.2) is only 1 SNP from OB10 (Region A, early March) and 3 from S01: same early genotype in both regions. The TV.2.2 genomes (OB08, OB07; Region C) are 2 SNPs from each other and 4 from the early TV.2 group. OB14 (Region C, TV.2.1) is 4 SNPs from OB23 (Region A, TV.2.1) but 10 from the Region C TV.2.2 cluster: it is linked to the Region A expansion, not to the local Region C cluster. OB03 (TV.3, Region B) is far from all of them (16 SNPs or more)."
+    "objectID": "exercises/00_command_line.html#goal",
+    "href": "exercises/00_command_line.html#goal",
+    "title": "Exercise 0 — Command line basics",
+    "section": "",
+    "text": "Practise the basic Linux commands and, above all, paths, on a small project that looks like the one you will use for the pipelines.\nTime: about 45 minutes. Rules: type every command yourself (no copy-paste for parts A to C), and run pwd whenever you are unsure where you are. Solutions are hidden below each part: try first, then check."
   },
   {
-    "objectID": "course/05-workflow.html#interpret-and-write",
-    "href": "course/05-workflow.html#interpret-and-write",
-    "title": "Suggested workflow",
-    "section": "6. Interpret and write",
-    "text": "6. Interpret and write\nUse the certainty wording, the brief template and the deliverable rules. Compare with the model answer only after you wrote yours."
+    "objectID": "exercises/00_command_line.html#part-a-where-am-i",
+    "href": "exercises/00_command_line.html#part-a-where-am-i",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part A — Where am I?",
+    "text": "Part A — Where am I?\n\nOpen a terminal. Which command shows your current folder?\nList the content of your home folder with sizes in a readable format, including hidden files.\nGo to the root of the system (/), list it, then come back to the previous folder in one command.\nGo to your home folder in two different ways.\n\n\n\n\n\n\n\nNoteSolution A\n\n\n\n\n\npwd                # 1. e.g. /home/awa\nls -lah            # 2. -l long, -a hidden files, -h readable sizes\ncd /               # 3. go to the root\nls\ncd -               #    back to the previous folder\ncd ~               # 4. way 1\ncd                 #    way 2 (no argument = home)"
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-b-build-the-project",
+    "href": "exercises/00_command_line.html#part-b-build-the-project",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part B — Build the project",
+    "text": "Part B — Build the project\nWe create the following tree in your home folder:\nbridge/\n├── data/\n├── ref/\n├── results/\n│   └── trimmed/\n└── logs/\n\nCreate it with one mkdir command.\nGo into bridge and check the tree with ls -R.\nCreate an empty file logs/notes.txt without leaving the bridge folder.\n\n\n\n\n\n\n\nNoteSolution B\n\n\n\n\n\nmkdir -p ~/bridge/{data,ref,results/trimmed,logs}   # 1. -p creates parents, {} makes several folders\ncd ~/bridge                                         # 2.\nls -R\ntouch logs/notes.txt                                # 3. relative path from bridge/\nExpected ls -R output (order may vary):\n.:\ndata  logs  ref  results\n\n./data:\n\n./logs:\n\n./ref:\n\n./results:\ntrimmed\n\n./results/trimmed:"
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-c-create-small-data-files",
+    "href": "exercises/00_command_line.html#part-c-create-small-data-files",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part C — Create small data files",
+    "text": "Part C — Create small data files\nReal FASTQ files are huge, so we create a tiny fake one. The command cat &gt; file &lt;&lt; 'EOF' writes everything you type, up to the line EOF, into the file.\nFrom ~/bridge, run:\ncat &gt; data/sample1_R1.fastq &lt;&lt; 'EOF'\n@read1\nACGTACGTAC\n+\nIIIIHHHHGG\n@read2\nGGGGCCCCAA\n+\nIIIIIIIIII\n@read3\nTTTTAAAACC\n+\nHHHHHHHHHH\nEOF\ncat &gt; ref/reference.fasta &lt;&lt; 'EOF'\n&gt;segment_L\nACGTACGTACGTACGTACGT\n&gt;segment_S\nTTTTGGGGCCCCAAAATTTT\nEOF\nNow answer, using commands (not by eye):\n\nHow many lines does sample1_R1.fastq have? How many reads is that (4 lines per read)?\nDisplay only the first read (first 4 lines).\nHow many sequences are in reference.fasta? Display their names only.\nCreate sample1_R2.fastq as a copy of sample1_R1.fastq, then check with ls -lh data.\n\n\n\n\n\n\n\nNoteSolution C\n\n\n\n\n\nwc -l data/sample1_R1.fastq              # 1. 12 lines -&gt; 12 / 4 = 3 reads\nhead -n 4 data/sample1_R1.fastq          # 2.\ngrep -c \"&gt;\" ref/reference.fasta          # 3. 2 sequences\ngrep \"&gt;\" ref/reference.fasta             #    &gt;segment_L and &gt;segment_S\ncp data/sample1_R1.fastq data/sample1_R2.fastq   # 4.\nls -lh data"
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-d-paths-the-most-important-part",
+    "href": "exercises/00_command_line.html#part-d-paths-the-most-important-part",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part D — Paths (the most important part)",
+    "text": "Part D — Paths (the most important part)\n\nGo into results/trimmed and run pwd.\nFrom there, copy sample1_R1.fastq from data into the current folder using a relative path (use ..).\nRename the copy to sample1_R1_trimmed.fastq.\nFrom the same folder (results/trimmed), copy sample1_R2.fastq into it using an absolute path (use ~).\nWithout leaving the folder, display the first 4 lines of ../../ref/reference.fasta.\nGo back to ~/bridge in one command, using a relative path, then in one command using an absolute path.\n\n\n\n\n\n\n\nNoteSolution D\n\n\n\n\n\ncd results/trimmed                                    # 1.\npwd                                                   #    /home/awa/bridge/results/trimmed\ncp ../../data/sample1_R1.fastq .                      # 2. ../../ = two levels up, . = here\nmv sample1_R1.fastq sample1_R1_trimmed.fastq          # 3.\ncp ~/bridge/data/sample1_R2.fastq .                   # 4. absolute path works from anywhere\nhead -n 4 ../../ref/reference.fasta                   # 5.\ncd ../..                                              # 6. relative\ncd ~/bridge                                           #    absolute\nWhy ../..? results/trimmed → .. is results → ../.. is bridge."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-e-wildcards",
+    "href": "exercises/00_command_line.html#part-e-wildcards",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part E — Wildcards",
+    "text": "Part E — Wildcards\n\nCreate sample2_R1.fastq and sample2_R2.fastq as copies of the sample1 files (in data/).\nList only the R1 files of data/.\nList sample1_R1.fastq and sample1_R2.fastq with one pattern using { }.\nList all the files of data/ whose name starts with sample followed by exactly one character, then _R1.\nBefore deleting anything: list with ls the files you would remove with rm data/sample2*, then delete them. Explain why you ran ls first.\n\n\n\n\n\n\n\nNoteSolution E\n\n\n\n\n\ncp data/sample1_R1.fastq data/sample2_R1.fastq        # 1.\ncp data/sample1_R2.fastq data/sample2_R2.fastq\nls data/*_R1.fastq                                    # 2.\nls data/sample1_R{1,2}.fastq                          # 3.\nls data/sample?_R1.fastq                              # 4.\nls data/sample2*                                      # 5. check what matches...\nrm data/sample2*                                      #    ...then delete\nrm is permanent and the * may match more files than expected, so ls with the same pattern shows exactly what will be deleted."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-f-pipes-and-redirections",
+    "href": "exercises/00_command_line.html#part-f-pipes-and-redirections",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part F — Pipes and redirections",
+    "text": "Part F — Pipes and redirections\nFrom ~/bridge:\n\nSave the list of files of data/ in logs/files.txt.\nAdd the line Exercise 0 - part F done at the end of logs/notes.txt (do not erase the file).\nCount the files of data/ with a pipe (no file involved).\nCount how many lines of data/sample1_R1.fastq start with @ using grep, and compare with your answer to C1. Why is the result the same here?\nRun ls data/does_not_exist 2&gt; logs/errors.txt and read logs/errors.txt. What did 2&gt; save?\n\n\n\n\n\n\n\nNoteSolution F\n\n\n\n\n\nls data &gt; logs/files.txt                      # 1. &gt; replaces the file\necho \"Exercise 0 - part F done\" &gt;&gt; logs/notes.txt   # 2. &gt;&gt; appends\nls data | wc -l                               # 3. 3 files (sample1_R1, sample1_R2... plus sample2 if not deleted)\ngrep -c \"^@\" data/sample1_R1.fastq            # 4. 3\ncat logs/errors.txt                           # 5. the error message\n\n^@ means “line starting with @”. It gives 3 here because each read has one header line. Warning: in real files, a quality line can also start with @ (it is a valid quality character), so counting @ is not a reliable way to count reads. Use wc -l divided by 4, or seqkit stats.\n2&gt; saves the error messages (stream 2), not the normal output."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-g-compressed-files",
+    "href": "exercises/00_command_line.html#part-g-compressed-files",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part G — Compressed files",
+    "text": "Part G — Compressed files\n\nCompress data/sample1_R1.fastq keeping the original (gzip -k).\nCompare the sizes of the two files with ls -lh. (With 3 reads the gain is tiny, but with real data it is large.)\nDisplay the first 4 lines of the compressed file without decompressing it.\nCompute the number of reads of the .gz file in one command line.\nUse file on both files. What do you see?\n\n\n\n\n\n\n\nNoteSolution G\n\n\n\n\n\ngzip -k data/sample1_R1.fastq                                # 1. creates sample1_R1.fastq.gz\nls -lh data/sample1_R1.fastq*                                # 2.\nzcat data/sample1_R1.fastq.gz | head -n 4                    # 3.\necho $(( $(zcat data/sample1_R1.fastq.gz | wc -l) / 4 ))     # 4. 3\nfile data/sample1_R1.fastq data/sample1_R1.fastq.gz          # 5. \"ASCII text\" vs \"gzip compressed data\"\nIf -k is not accepted (very old gzip), use gzip -c data/sample1_R1.fastq &gt; data/sample1_R1.fastq.gz."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-h-a-loop-and-a-variable",
+    "href": "exercises/00_command_line.html#part-h-a-loop-and-a-variable",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part H — A loop and a variable",
+    "text": "Part H — A loop and a variable\n\nWrite a loop that prints, for each *_R1.fastq file of data/, its name and its number of reads, in the form data/sample1_R1.fastq: 3 reads.\nRedo the loop but save the output in logs/read_counts.txt.\nUse a variable SAMPLE=sample1 to display data/sample1_R1.fastq and data/sample1_R2.fastq with echo.\n\n\n\n\n\n\n\nNoteSolution H\n\n\n\n\n\nfor f in data/*_R1.fastq        # 1.\ndo\n  echo \"$f: $(( $(wc -l &lt; $f) / 4 )) reads\"\ndone\n\nfor f in data/*_R1.fastq        # 2. redirect the whole loop\ndo\n  echo \"$f: $(( $(wc -l &lt; $f) / 4 )) reads\"\ndone &gt; logs/read_counts.txt\ncat logs/read_counts.txt\n\nSAMPLE=sample1                  # 3. no spaces around =\necho \"data/${SAMPLE}_R1.fastq\"\necho \"data/${SAMPLE}_R2.fastq\"\nwc -l &lt; $f (with &lt;) prints only the number, without the file name."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-i-find-the-error",
+    "href": "exercises/00_command_line.html#part-i-find-the-error",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part I — Find the error",
+    "text": "Part I — Find the error\nEach command fails. Explain why and fix it. Run them from ~/bridge.\ncd Data                         # 1\nls /data                        # 2\ncat data/sample1_r1.fastq       # 3\nmkdir my results                # 4  (check with ls what was created!)\necho \"#!/bin/bash\" &gt; run.sh\necho \"echo Hello\" &gt;&gt; run.sh\n./run.sh                        # 5\n\n\n\n\n\n\nNoteSolution I\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n#\nError\nWhy\nFix\n\n\n\n\n1\nNo such file or directory\nLinux is case-sensitive: the folder is data, not Data\ncd data\n\n\n2\nNo such file or directory\n/data is an absolute path (at the root of the system)\nls data (relative) or ls ~/bridge/data\n\n\n3\nNo such file or directory\nsample1_r1 ≠ sample1_R1 (case)\ncat data/sample1_R1.fastq (use Tab!)\n\n\n4\nNo error, but two folders my and results are created (or results already exists)\nthe space separates two arguments\nmkdir my_results or mkdir \"my results\" (avoid spaces)\n\n\n5\nPermission denied\nthe file is not executable\nchmod +x run.sh then ./run.sh, or bash run.sh\n\n\n\nClean up after question 4: rmdir my (only works if empty; do not remove results!)."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#part-j-final-challenge",
+    "href": "exercises/00_command_line.html#part-j-final-challenge",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Part J — Final challenge",
+    "text": "Part J — Final challenge\nWithout using cd at all, from any folder (start with cd /tmp):\n\nDisplay the first 4 lines of ~/bridge/data/sample1_R1.fastq.\nCreate the folder ~/bridge/results/qc.\nWrite the number of reads of sample1_R1.fastq in ~/bridge/results/qc/n_reads.txt.\nDisplay the whole project tree with ls -R ~/bridge.\n\n\n\n\n\n\n\nNoteSolution J\n\n\n\n\n\ncd /tmp\nhead -n 4 ~/bridge/data/sample1_R1.fastq                                   # 1.\nmkdir -p ~/bridge/results/qc                                               # 2.\necho $(( $(wc -l &lt; ~/bridge/data/sample1_R1.fastq) / 4 )) &gt; ~/bridge/results/qc/n_reads.txt   # 3.\ncat ~/bridge/results/qc/n_reads.txt                                        #    3\nls -R ~/bridge                                                             # 4.\nAbsolute paths (with ~) work from anywhere, which is why this works from /tmp."
+  },
+  {
+    "objectID": "exercises/00_command_line.html#clean-up-optional",
+    "href": "exercises/00_command_line.html#clean-up-optional",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Clean up (optional)",
+    "text": "Clean up (optional)\nCheck twice what you delete:\nls ~/bridge        # is it really the practice folder?\nrm -r ~/bridge"
+  },
+  {
+    "objectID": "exercises/00_command_line.html#checklist",
+    "href": "exercises/00_command_line.html#checklist",
+    "title": "Exercise 0 — Command line basics",
+    "section": "Checklist",
+    "text": "Checklist\nYou are ready for the next exercise if you can:\n\nsay where you are (pwd) and what is around you (ls)\nexplain the difference between an absolute and a relative path\nuse ., .., ~ and -\ncreate, copy, move and delete files and folders safely\nread the start of a big or compressed file (head, zcat)\ncount lines and reads, and use grep\nchain commands with | and save results with &gt; and &gt;&gt;\nunderstand No such file or directory and Permission denied\n\nNext: FASTQ and quality control."
   },
   {
     "objectID": "exercises/01_fastq_and_qc.html",
